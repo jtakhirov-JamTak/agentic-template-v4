@@ -19,18 +19,27 @@ guardrails are kept and hardened.
    — no shell, no `python3`-not-found silent death. SubagentStart plain-stdout
    injection deleted (it never reached the subagent; only JSON
    `additionalContext` does).
-5. **Wider destructive-git coverage, fewer prompts**: `permissions.deny` for
-   `git reset`, `git clean`, `git checkout --`, force-push, `rm -rf`; regex belt
-   in bash_guard for chained forms. Default mode is `acceptEdits` with an
-   `allow` list for routine dev commands (npm/npx/node, git status/diff/add,
-   supabase, localhost curl), so build sessions run prompt-free. The only
-   `ask` gate is `git push` — the moment work leaves the machine. Commits are
-   governed behaviorally (CLAUDE.md + global "only when I ask") and
-   quality-gated by pre-commit verify, so they don't prompt. Deny always beats
-   allow, so the guardrails hold in every mode.
-6. **Secrets scanner** now catches env-style `SUPABASE_SERVICE_ROLE_KEY=eyJ…`
+5. **Wider destructive coverage, both shells, fewer prompts**:
+   `permissions.deny` for `git reset`, `git clean`, `git checkout --`,
+   force-push, `rm -rf`, and `Remove-Item` — each mirrored for the PowerShell
+   tool, which previously had zero coverage. Regex belt in `shell_guard` for
+   chained forms. An `allow` list covers routine dev commands (npm/npx/node,
+   git status/diff/add, supabase, localhost curl) in both shells. The only
+   `ask` gate is `git push` — the moment work leaves the machine. Commits carry
+   no allow rule on purpose, so they route through the auto-mode classifier
+   that reads global `CLAUDE.md` ("never commit unless asked"); they still run
+   without a terminal prompt. Deny always beats allow, so the guardrails hold
+   in every mode.
+6. **No `defaultMode` in project settings.** A project-level `"auto"` is a
+   documented no-op, and setting any value here overrides your user-level
+   preference. With the key absent, `~/.claude/settings.json` decides. In auto
+   mode, broad exec allow rules (package-manager run commands, wildcarded
+   interpreters like `node:*`) are dropped by design and route to the
+   classifier; narrow rules stay in effect. The full allow list is kept anyway
+   — it applies when cycling to manual/acceptEdits mid-session.
+7. **Secrets scanner** now catches env-style `SUPABASE_SERVICE_ROLE_KEY=eyJ…`
    and `sb_secret_…` keys.
-7. **`/interview` is a three-phase pipeline** — DISCOVER (elicitation only;
+8. **`/interview` is a three-phase pipeline** — DISCOVER (elicitation only;
    no solution commitments) → non-blocking problem summary written to SPEC.md
    → DESIGN (no-build test, alternatives only when consequential, aggressive
    delete with the 10% rule, cost-to-reverse spikes) → direction gate
@@ -48,14 +57,24 @@ guardrails are kept and hardened.
 | Project state | `docs/` | SPEC, PROGRESS, BACKLOG, DECISIONS, FIX_LOG, evals |
 
 ## Setup (per new app)
-1. Copy template → new repo → `git init` → `git config core.hooksPath .githooks`.
-2. `git update-index --chmod=+x .githooks/pre-commit` after the first `git add`
+
+This repo is a GitHub template repository. The `/new-app` command in
+`~/.claude/commands/` runs the whole sequence; do it by hand as follows if you
+prefer. Run from your dev root, never from the home directory itself — a session
+started there loads no project `CLAUDE.md`.
+
+1. `gh repo create <name> --template jtakhirov-JamTak/agentic-template-v4 --private --clone`
+2. `cd <name>` ; `git config core.hooksPath .githooks`
+3. `git update-index --chmod=+x .githooks/pre-commit` then commit the mode change
    (Windows can't set the executable bit; CI/WSL/macOS skip non-executable hooks).
-3. Confirm `python --version` works in the shell Claude Code uses. If only `py`
-   resolves, change `"command": "python"` to `"command": "py"` in settings.json.
-4. Start `claude` (sessions open in acceptEdits; Shift+Tab to cycle modes).
+   Confirm with `git ls-files -s .githooks/pre-commit` — mode should be `100755`.
+4. Confirm `python --version` works in the shell Claude Code uses. If only `py`
+   resolves, change `"command": "python"` to `"command": "py"` in
+   `.claude/settings.json` — all three hook entries.
+5. Start `claude`. Session mode comes from your user settings (auto by default),
+   not from this repo; Shift+Tab cycles modes.
    For planning: Shift+Tab into Plan Mode, run `/interview <app idea>`.
-5. Fresh session → build feature 1 → evaluator pass → continue per CLAUDE.md.
+6. Fresh session → build feature 1 → evaluator pass → continue per CLAUDE.md.
 
 ## Global install (optional, one-time)
 - Copy `global/skills/solutioning/` to `~/.claude/skills/solutioning/` — the
@@ -69,15 +88,31 @@ guardrails are kept and hardened.
 - Commit `~/.claude` after (it is a git repo).
 
 ## Verify the guardrails before trusting them (5 minutes)
-- `/hooks` shows the three PreToolUse hooks; `/permissions` shows deny/ask rules.
+
+Run the shell checks through **both** tools — `shell_guard.py` is registered for
+`Bash|PowerShell`, and PowerShell is the path that had no coverage before v4.
+
+- `/hooks` shows the three PreToolUse hooks, the last matching `Bash|PowerShell`;
+  `/permissions` shows deny/ask rules for both tools.
 - Ask Claude to read `.env` → denied. Write a fake `AKIA…` key → blocked.
   Write `SUPABASE_SERVICE_ROLE_KEY=eyJ<25 chars>` → blocked.
+  Read `.env.example` → allowed (committed on purpose; `.env.local` still denied).
 - Edit a file in `supabase/migrations/` → blocked. Edit `CLAUDE.md` → blocked.
-- `npm test` runs without a prompt. `git push` → asks you.
-  `git commit --no-verify` → blocked.
-  `git reset --hard` → blocked (even chained after `npm test &&`).
+- `npm test` runs without a prompt. `git push` → asks you, in either shell.
+- Blocked in **both** shells: `git commit --no-verify` and its `-n` shorthand ·
+  `git config core.hooksPath x` · `git reset --hard` (even chained after
+  `npm test &&` in bash or `npm test ;` in PowerShell) · `git restore .`
+- PowerShell specifically: `Get-Content .env` → blocked, and so are its aliases
+  `gc` and `type` (commands are canonicalized before matching) ·
+  `Set-Content supabase/migrations/001.sql` → blocked ·
+  recursive `Remove-Item` → denied.
 - With a failing `npm run verify`, `git commit` → pre-commit rejects.
-- Spawn the evaluator; have it try `echo x > src/a.ts` → allowlist blocks it.
+- Spawn the evaluator; have it try `echo x > src/a.ts` (bash) or
+  `Set-Content src/a.ts 'x'` (PowerShell) → allowlist blocks both.
+
+The `shell_guard` rules are covered by a block/allow case table in both
+directions — a rule that stops firing and a rule that over-matches each show up
+as a failure. Re-run it after editing any pattern.
 
 ## Version-sensitive (check once on your Claude Code version)
 - `isolation: worktree` in agent frontmatter — if unsupported, fall back to a
@@ -93,7 +128,7 @@ guardrails are kept and hardened.
 2. Hooks fail open on their own bugs (by design, except allowlist matches).
    They stop drift, not a determined bypass.
 3. Stack assumptions: `npm run verify`, Supabase/Postgres migration dirs. Edit
-   `protect_paths.py` / `bash_guard.py` / `.githooks/pre-commit` for other stacks.
+   `protect_paths.py` / `shell_guard.py` / `.githooks/pre-commit` for other stacks.
 4. Governance lock: the agent can't edit `.claude/`, `.githooks/`, `CLAUDE.md`.
    You edit those manually — that's the point.
 

@@ -27,9 +27,9 @@ Derive user identity from the verified server session. Never authorize from a
 client-supplied user ID alone.
 
 ## Data standards
-- Times are UTC in the database; convert at the edge.
-- Never hard-delete data with history value: use `archived_at`; only an
-  explicit human request removes a row.
+Global rules (`~/.claude/CLAUDE.md`) also apply: UTC times, `archived_at`
+instead of delete, and falsifiable verification.
+
 - Enums as text columns with CHECK constraints, not native enum types.
 - Cursor pagination needs a unique tie-breaker column in the ordering.
 

@@ -1,6 +1,5 @@
 {
   "permissions": {
-    "defaultMode": "acceptEdits",
     "deny": [
       "Read(./.env)",
       "Read(./.env.*)",
@@ -14,7 +13,13 @@
       "Bash(git checkout -- :*)",
       "Bash(git push --force:*)",
       "Bash(git push -f:*)",
-      "Bash(rm -rf:*)"
+      "Bash(rm -rf:*)",
+      "PowerShell(git reset:*)",
+      "PowerShell(git clean:*)",
+      "PowerShell(git checkout -- :*)",
+      "PowerShell(git push --force:*)",
+      "PowerShell(git push -f:*)",
+      "PowerShell(Remove-Item:*)"
     ],
     "allow": [
       "Bash(npm run:*)",
@@ -37,10 +42,33 @@
       "Bash(mkdir:*)",
       "Bash(curl localhost:*)",
       "Bash(curl http://localhost:*)",
-      "Bash(supabase:*)"
+      "Bash(supabase:*)",
+      "PowerShell(npm run:*)",
+      "PowerShell(npm test:*)",
+      "PowerShell(npm install:*)",
+      "PowerShell(npm ci)",
+      "PowerShell(npx:*)",
+      "PowerShell(node:*)",
+      "PowerShell(git status)",
+      "PowerShell(git diff:*)",
+      "PowerShell(git log:*)",
+      "PowerShell(git add:*)",
+      "PowerShell(git stash:*)",
+      "PowerShell(git branch:*)",
+      "PowerShell(git worktree:*)",
+      "PowerShell(Get-ChildItem:*)",
+      "PowerShell(Get-Content:*)",
+      "PowerShell(Select-String:*)",
+      "PowerShell(Test-Path:*)",
+      "PowerShell(Get-Command:*)",
+      "PowerShell(New-Item -ItemType Directory:*)",
+      "PowerShell(curl localhost:*)",
+      "PowerShell(curl http://localhost:*)",
+      "PowerShell(supabase:*)"
     ],
     "ask": [
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "PowerShell(git push:*)"
     ]
   },
   "hooks": {
@@ -71,12 +99,12 @@
         ]
       },
       {
-        "matcher": "Bash",
+        "matcher": "Bash|PowerShell",
         "hooks": [
           {
             "type": "command",
             "command": "python",
-            "args": ["${CLAUDE_PROJECT_DIR}/scripts/hooks/bash_guard.py"]
+            "args": ["${CLAUDE_PROJECT_DIR}/scripts/hooks/shell_guard.py"]
           }
         ]
       }
