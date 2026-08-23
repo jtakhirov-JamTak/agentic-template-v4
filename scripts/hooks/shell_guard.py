@@ -187,9 +187,13 @@ def check_recursive_delete(cmd, powershell):
 
         if powershell:
             # canon_ps already resolved rm/del/ri/rd/erase -> remove-item.
+            # -Recurse is the only -r* parameter Remove-Item takes, so any flag
+            # abbreviating to -r means recursive: -r, -rec, -Recurse:$true.
             if head == "remove-item":
-                block("Blocked: Remove-Item deletes without a recycle-bin step. "
-                      "Show the human what would be deleted first.")
+                for tok in toks[1:]:
+                    if tok.lower().startswith("-r"):
+                        block("Blocked: recursive delete. Show the human what "
+                              "would be deleted first.")
             continue
 
         if head != "rm":

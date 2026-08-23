@@ -80,11 +80,17 @@ CASES = [
     ("Bash", "rm --recursive ./src", "", 2, "rm --recursive long form"),
     ("Bash", "cd x ; rm -rf y", "", 2, "rm not first token"),
     ("Bash", "npm test && rm -rf dist", "", 2, "rm after &&"),
-    ("PowerShell", "Remove-Item ./src", "", 2, "ps Remove-Item"),
-    ("PowerShell", "Remove-Item -Force ./src", "", 2, "ps Remove-Item no -Recurse"),
+    ("PowerShell", "Remove-Item -Recurse ./src", "", 2, "ps recursive"),
     ("PowerShell", "ri -r -fo ./src", "", 2, "ps abbreviated flags via alias ri"),
-    ("PowerShell", "del foo", "", 2, "ps del alias"),
-    ("PowerShell", "npm test ; Remove-Item x", "", 2, "ps Remove-Item not first"),
+    ("PowerShell", "rm -Recurse -Force ./src", "", 2, "ps recursive via alias rm"),
+    ("PowerShell", "npm test ; Remove-Item -Recurse x", "", 2, "ps recursive not first"),
+    ("PowerShell", "Remove-Item -Recurse:$true x", "", 2, "ps -Recurse:$true form"),
+    # Single-file delete: hook allows, symmetric with bash `rm file.txt`. The
+    # template's PowerShell(Remove-Item:*) deny rule is the stricter layer, and
+    # the CLAUDE.md hard stop governs it behaviourally everywhere else.
+    ("PowerShell", "Remove-Item ./one.txt", "", 0, "ps single-file delete allowed"),
+    ("PowerShell", "Remove-Item -Force ./one.txt", "", 0, "ps -Force single file allowed"),
+    ("PowerShell", "del foo.txt", "", 0, "ps del single file allowed"),
     # non-recursive single-file rm stays allowed: the bash deny list does not
     # cover it either, and blocking it would make the ALLOW column meaningless
     ("Bash", "rm file.txt", "", 0, "rm single file allowed"),

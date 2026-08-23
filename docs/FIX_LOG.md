@@ -65,8 +65,17 @@ every command segment and reads the flags, so flag order, flag splitting,
 abbreviation, aliasing, and position in the line all stop mattering. Force push
 is matched on every spelling: `--force`, `-f`, `--force-with-lease`,
 `--force-if-includes`, and `+ref` refspecs, on any branch rather than only
-main/master. Non-recursive `rm file.txt` stays allowed — the deny list does not
-cover it either, and blocking it would leave the ALLOW column proving nothing.
+main/master.
+
+Single-file deletes stay allowed in **both** shells — `rm file.txt` and
+`Remove-Item one.txt`. The hook draws its line at the recursive case, which is
+the data-loss event; blocking every delete would leave the ALLOW column proving
+nothing and would fire constantly on temp files. The template's
+`PowerShell(Remove-Item:*)` deny rule is still the stricter layer inside a
+scaffolded app, and the `CLAUDE.md` hard stop ("show me what something is
+before you delete it") governs single-file deletes behaviourally everywhere.
+**Residual risk, stated plainly: a single-file delete is not mechanically
+gated outside a template-derived project.**
 
 **Regression test.** 23 new cases in `test_shell_guard.py` (84 total). Verified
 falsifiable: removing the `check_recursive_delete()` call turns it 69/84 red on
