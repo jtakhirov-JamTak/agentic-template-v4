@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Native git layer: red code cannot be committed, regardless of which agent
+# (or human) runs `git commit`. Installed by: git config core.hooksPath .githooks
+# (the repo-scaffold skill does this in Stage 3; bash_guard blocks repointing it
+# and blocks --no-verify).
+set -euo pipefail
+if [ -f package.json ] && grep -q '"verify"' package.json; then
+  echo "[pre-commit] npm run verify..."
+  npm run verify
+else
+  echo "[pre-commit] no verify script yet (pre-foundation) — allowing commit."
+fi

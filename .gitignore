@@ -1,0 +1,22 @@
+
+# Secrets — never committed (mirrors .claude/settings.json permissions.deny)
+.env
+.env.*
+!.env.example
+*.pem
+id_rsa*
+id_ed25519*
+
+# Dependencies and build output
+node_modules/
+dist/
+build/
+coverage/
+
+# OS cruft
+.DS_Store
+Thumbs.db
+
+# Python bytecode
+__pycache__/
+*.pyc
