@@ -84,3 +84,20 @@ exactly the delete cases, and restoring returns 84/84.
 **Lesson for the next app.** A prefix-matched deny rule is a statement about one
 spelling of a command, not about the capability. Anything genuinely destructive
 needs the hook layer, where the command can be parsed.
+
+## 2026-08-23 — Reading the hooks path was blocked as if it were a write
+
+**Problem.** The rule matched any `git config` line mentioning the hooks path,
+so reading the value was blocked along with setting it — including the bare
+read that `/new-app` step 2 uses to verify the path took. An over-block on a
+read is worse than a miss: it teaches the agent to route around the guard.
+It fired for real mid-session, on a commit message that merely quoted the
+command.
+
+**Fix.** Split into write-only forms — a value following the key, or
+`--unset` / `--unset-all` / `--replace-all` / `--add`. Reads pass.
+
+**Regression test.** 9 cases (95 total): four write forms blocked, four read
+forms allowed, plus the PowerShell mirror.
+
+**Where found.** A real session, not a review.
