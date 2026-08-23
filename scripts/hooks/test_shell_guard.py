@@ -72,6 +72,33 @@ CASES = [
     ("PowerShell", "Get-ChildItem .", "", 0, "ps list dir"),
     ("PowerShell", "Set-Content src/new.ts 'x'", "", 0, "ps write ordinary source"),
     ("PowerShell", "Write-Output 'hello'", "", 0, "ps echo"),
+    # ---- recursive delete: prefix deny rules miss all of these ----
+    ("Bash", "rm -rf ./src", "", 2, "rm -rf project dir"),
+    ("Bash", "rm -fr ./src", "", 2, "rm -fr flag order swapped"),
+    ("Bash", "rm -r -f ./src", "", 2, "rm -r -f flags split"),
+    ("Bash", "rm -R ./src", "", 2, "rm -R capital"),
+    ("Bash", "rm --recursive ./src", "", 2, "rm --recursive long form"),
+    ("Bash", "cd x ; rm -rf y", "", 2, "rm not first token"),
+    ("Bash", "npm test && rm -rf dist", "", 2, "rm after &&"),
+    ("PowerShell", "Remove-Item ./src", "", 2, "ps Remove-Item"),
+    ("PowerShell", "Remove-Item -Force ./src", "", 2, "ps Remove-Item no -Recurse"),
+    ("PowerShell", "ri -r -fo ./src", "", 2, "ps abbreviated flags via alias ri"),
+    ("PowerShell", "del foo", "", 2, "ps del alias"),
+    ("PowerShell", "npm test ; Remove-Item x", "", 2, "ps Remove-Item not first"),
+    # non-recursive single-file rm stays allowed: the bash deny list does not
+    # cover it either, and blocking it would make the ALLOW column meaningless
+    ("Bash", "rm file.txt", "", 0, "rm single file allowed"),
+    ("Bash", "rm -f file.txt", "", 0, "rm -f single file allowed"),
+    # ---- force push: every spelling ----
+    ("Bash", "git push --force-with-lease", "", 2, "force-with-lease, no branch"),
+    ("Bash", "git push --force-with-lease origin main", "", 2, "force-with-lease + main"),
+    ("Bash", "git push --force-if-includes origin x", "", 2, "force-if-includes"),
+    ("Bash", "git push origin +main", "", 2, "refspec force push"),
+    ("Bash", "git push -f origin feature", "", 2, "short -f any branch"),
+    ("PowerShell", "git push origin +main", "", 2, "ps refspec force push"),
+    ("PowerShell", "git push --force-with-lease", "", 2, "ps force-with-lease"),
+    ("Bash", "git push origin main", "", 0, "ordinary push allowed (ask-gated)"),
+    ("Bash", "git push", "", 0, "bare push allowed (ask-gated)"),
     # ---- evaluator allowlist, Bash ----
     ("Bash", "npm test", "evaluator", 0, "eval bash npm test"),
     ("Bash", "git status", "evaluator", 0, "eval bash git status"),

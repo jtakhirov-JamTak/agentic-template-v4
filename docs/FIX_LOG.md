@@ -45,3 +45,33 @@ blocked. The last two are what stop this fix from becoming a hole.
 
 **Where found.** First run of the new `shell_guard` test table — a
 block-only test suite would not have caught it.
+
+## 2026-08-23 — Recursive delete and force push were reachable around both layers
+
+**Problem.** `permissions.deny` matches on a command *prefix*, so `Bash(rm -rf:*)`
+covered `rm -rf x` and nothing else — not `rm -fr x`, not `rm -r -f x`, and not
+`cd s ; rm -rf x`, where `rm` is not the first token. `shell_guard`'s own `rm`
+rule did not close the gap: it only fired when the target was `/`, `~`, or
+`$HOME`, so **project files were never protected by either layer**. Force push
+had the same shape: the rule required `--force`/`-f` *and* an explicit
+`main`/`master`, so `git push --force-with-lease` and the refspec form
+`git push origin +main` both passed.
+
+Found by a `/permissions` review in a scaffolded app, then reproduced against
+the hook directly: seven commands that should have been blocked were allowed.
+
+**Fix.** Recursive deletes now go through `check_recursive_delete()`, which walks
+every command segment and reads the flags, so flag order, flag splitting,
+abbreviation, aliasing, and position in the line all stop mattering. Force push
+is matched on every spelling: `--force`, `-f`, `--force-with-lease`,
+`--force-if-includes`, and `+ref` refspecs, on any branch rather than only
+main/master. Non-recursive `rm file.txt` stays allowed — the deny list does not
+cover it either, and blocking it would leave the ALLOW column proving nothing.
+
+**Regression test.** 23 new cases in `test_shell_guard.py` (84 total). Verified
+falsifiable: removing the `check_recursive_delete()` call turns it 69/84 red on
+exactly the delete cases, and restoring returns 84/84.
+
+**Lesson for the next app.** A prefix-matched deny rule is a statement about one
+spelling of a command, not about the capability. Anything genuinely destructive
+needs the hook layer, where the command can be parsed.

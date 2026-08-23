@@ -102,6 +102,13 @@ Run the shell checks through **both** tools — `shell_guard.py` is registered f
 - Blocked in **both** shells: `git commit --no-verify` and its `-n` shorthand ·
   `git config core.hooksPath x` · `git reset --hard` (even chained after
   `npm test &&` in bash or `npm test ;` in PowerShell) · `git restore .`
+- Recursive delete, every spelling: `rm -rf`, `rm -fr`, `rm -r -f`, `rm -R`,
+  `rm --recursive`, and any of them after a `;` or `&&`. The deny rules catch
+  only the literal `rm -rf ` prefix; the hook parses flags, so arrangement and
+  position do not matter. `rm file.txt` stays allowed.
+- Force push, every spelling: `--force`, `-f`, `--force-with-lease`,
+  `--force-if-includes`, and `git push origin +main`. Ordinary
+  `git push origin main` is allowed here and gated by the `ask` rule instead.
 - PowerShell specifically: `Get-Content .env` → blocked, and so are its aliases
   `gc` and `type` (commands are canonicalized before matching) ·
   `Set-Content supabase/migrations/001.sql` → blocked ·

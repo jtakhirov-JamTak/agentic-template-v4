@@ -92,8 +92,15 @@ GIT_RULES = [
      "Bypassing commit verification is blocked. Fix the check instead."),
     (r"git\s+config\s+.*hooksPath",
      "Repointing git hooks is blocked. .githooks/pre-commit is a release control."),
-    (r"git\s+push\s+.*(--force|-f)\b.*\b(main|master)\b",
-     "Force-pushing to main/master is blocked."),
+    # Every force form, not just `--force` before an explicit main/master:
+    # --force-with-lease and --force-if-includes rewrite history too, and
+    # `git push origin +main` is a force push spelled as a refspec.
+    (r"git\s+push\b[^;|&]*(--force\b|--force-with-lease|--force-if-includes|\s-f\b)",
+     "Force-pushing is blocked. It rewrites published history — do it yourself "
+     "if you mean it."),
+    (r"git\s+push\b[^;|&]*\s\+[\w./-]+",
+     "That `+ref` refspec is a force push. Blocked — it rewrites published "
+     "history."),
     (r"git\s+reset\s+--hard",
      "git reset --hard is blocked. Show the human what would be discarded first."),
     (r"git\s+clean\s+-[a-zA-Z]*f",
@@ -106,8 +113,9 @@ GIT_RULES = [
 
 # --- Bash-only file rules ----------------------------------------------------
 BASH_RULES = [
-    (r"rm\s+(-[a-zA-Z]*r[a-zA-Z]*f|-[a-zA-Z]*f[a-zA-Z]*r)\s+(/|~|\$HOME)(\s|$)",
-     "Destructive recursive delete of home/root is blocked."),
+    # NOTE: recursive `rm` is handled by check_recursive_delete(), not here.
+    # A prefix rule cannot see `rm -fr`, `rm -r -f`, or an `rm` that is not the
+    # first command in the line.
     (r"(sed\s+-i|mv\s|rm\s|>\s*|tee\s)[^;|&]*" + MIGRATION_DIR,
      "Modifying migration files via shell is blocked. Create a new migration."),
     (r"(cat|echo|printf|tee)[^;|&]*(>>?|\|)\s*[^\s;|&]*" + ENVFILE + r"(\.|$|\s)",
@@ -122,9 +130,8 @@ PS_WRITE = (r"(set-content|add-content|out-file|new-item|remove-item|move-item|"
 PS_READ = r"(get-content|select-string|copy-item|get-item)"
 
 PS_RULES = [
-    (r"remove-item[^;|]*-recurse",
-     "Recursive delete via Remove-Item is blocked. Show the human what would be "
-     "deleted first."),
+    # NOTE: Remove-Item is handled by check_recursive_delete(), which sees it
+    # after alias canonicalization and does not depend on flag order.
     (PS_WRITE + r"[^;|]*" + MIGRATION_DIR,
      "Modifying migration files via shell is blocked. Create a new migration."),
     (r">>?\s*[^;|]*" + MIGRATION_DIR,
@@ -162,6 +169,43 @@ EVAL_DENY_PS = re.compile(
 def block(msg):
     print(msg, file=sys.stderr)
     sys.exit(2)
+
+
+def check_recursive_delete(cmd, powershell):
+    """Block recursive deletes wherever they appear in the line.
+
+    `permissions.deny` matches on a command PREFIX, so `Bash(rm -rf:*)` sees
+    `rm -rf x` and nothing else: not `rm -fr x`, not `rm -r -f x`, and not
+    `cd s ; rm -rf x`, where `rm` is not the first token. This walks every
+    segment and reads the flags, so arrangement and position stop mattering.
+    """
+    for segment in split_segments(cmd):
+        toks = segment.split()
+        if not toks:
+            continue
+        head = toks[0].lower()
+
+        if powershell:
+            # canon_ps already resolved rm/del/ri/rd/erase -> remove-item.
+            if head == "remove-item":
+                block("Blocked: Remove-Item deletes without a recycle-bin step. "
+                      "Show the human what would be deleted first.")
+            continue
+
+        if head != "rm":
+            continue
+        for tok in toks[1:]:
+            if not tok.startswith("-"):
+                continue
+            if tok == "--recursive" or tok == "-R":
+                block("Blocked: recursive delete. Show the human what would be "
+                      "deleted first.")
+            if tok.startswith("--"):
+                continue
+            # Combined short flags: -rf, -fr, -r, -Rf ...
+            if "r" in tok[1:] or "R" in tok[1:]:
+                block("Blocked: recursive delete. Show the human what would be "
+                      "deleted first.")
 
 
 def check_evaluator(cmd, powershell):
@@ -215,6 +259,8 @@ def main():
     for pat, msg in rules:
         if re.search(pat, probe, flags):
             block(f"Blocked: {msg}")
+
+    check_recursive_delete(probe, powershell)
 
     agent = (data.get("agent_type") or data.get("agent_name") or "").lower()
     if agent == "evaluator":
