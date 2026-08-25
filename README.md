@@ -1,60 +1,20 @@
 # Agentic App-Building Template (v4)
 
 Plan → Build → Evaluate. One human, one main session, one evaluator subagent,
-and a deterministic enforcement layer. v2's five-role pipeline is deleted; its
-guardrails are kept and hardened.
-
-## v4 changes (from v2)
-1. **Planning moved to the main session.** `/interview` (Plan Mode) replaces the
-   discovery + architect subagents — subagents can't interview you. Output is a
-   single `docs/SPEC.md` (merges INTAKE + SPEC + ARCHITECTURE).
-2. **Building moved to the main session.** No orchestrator, no builder subagent,
-   no contracts, no two-tier approval, no eval counter. You approve twice: SPEC
-   and release. Rules live in `CLAUDE.md` (35 lines).
-3. **One evaluator, triggered by risk**: first slice · auth/RLS/money/migration
-   features · pre-release. Evidence-only PASS/FAIL, never proposes fixes
-   (reduces false rejections). It runs in the real working tree — see residual
-   gap 1 for why, and what that costs.
-4. **Hooks fixed for Windows.** Exec form (`"command": "python", "args": [...]`)
-   — no shell, no `python3`-not-found silent death. SubagentStart plain-stdout
-   injection deleted (it never reached the subagent; only JSON
-   `additionalContext` does).
-5. **Wider destructive coverage, both shells, fewer prompts**:
-   `permissions.deny` for `git reset`, `git clean`, `git checkout --`,
-   force-push, `rm -rf`, and `Remove-Item` — each mirrored for the PowerShell
-   tool, which previously had zero coverage. Regex belt in `shell_guard` for
-   chained forms. An `allow` list covers routine dev commands (npm/npx/node,
-   git status/diff/add, supabase, localhost curl) in both shells. The only
-   `ask` gate is `git push` — the moment work leaves the machine. Commits carry
-   no allow rule on purpose, so they route through the auto-mode classifier
-   that reads global `CLAUDE.md` ("never commit unless asked"); they still run
-   without a terminal prompt. Deny always beats allow, so the guardrails hold
-   in every mode.
-6. **No `defaultMode` in project settings.** A project-level `"auto"` is a
-   documented no-op, and setting any value here overrides your user-level
-   preference. With the key absent, `~/.claude/settings.json` decides. In auto
-   mode, broad exec allow rules (package-manager run commands, wildcarded
-   interpreters like `node:*`) are dropped by design and route to the
-   classifier; narrow rules stay in effect. The full allow list is kept anyway
-   — it applies when cycling to manual/acceptEdits mid-session.
-7. **Secrets scanner** now catches env-style `SUPABASE_SERVICE_ROLE_KEY=eyJ…`
-   and `sb_secret_…` keys.
-8. **`/interview` is a three-phase pipeline** — DISCOVER (elicitation only;
-   no solution commitments) → non-blocking problem summary written to SPEC.md
-   → DESIGN (no-build test, alternatives only when consequential, aggressive
-   delete with the 10% rule, cost-to-reverse spikes) → direction gate
-   (decision to DECISIONS.md) → SPECIFY (8-section spec with measurement
-   method and a 3-item pre-mortem) → spec approval. The reusable operators
-   also ship as a global `solutioning` skill in `global/skills/`.
+and a deterministic enforcement layer.
 
 ## Layer map
 | Layer | Location | Job |
 |---|---|---|
-| Deterministic guardrails | `.claude/settings.json`, `scripts/hooks/`, `.githooks/`, CI | mechanically enforced workflow guardrails — they stop drift, not a determined bypass |
+| Deterministic guardrails | `.claude/settings.json`, `scripts/hooks/`, `.githooks/` | mechanically enforced workflow guardrails — they stop drift, not a determined bypass |
 | Workflow rules | `CLAUDE.md` | plan → build → evaluate, session hygiene |
 | Evaluator | `.claude/agents/evaluator.md` | independent, isolated verification |
-| Procedures | `.claude/skills/engineering-conventions/` | schema/auth/money/test rules, on demand |
+| Procedures | `.claude/skills/engineering-conventions/` | schema/auth/money/endpoint/webhook/test rules, on demand |
+| Scoped rules | `.claude/rules/` | rules that load only for the file types they apply to |
 | Project state | `docs/` | SPEC, PROGRESS, BACKLOG, DECISIONS, FIX_LOG, evals |
+
+There is no CI in this repo. When a workflow is added, it belongs in the guardrail
+row — until then, the deterministic layer is what is listed above and nothing more.
 
 ## Setup (per new app)
 
@@ -70,7 +30,7 @@ started there loads no project `CLAUDE.md`.
    Confirm with `git ls-files -s .githooks/pre-commit` — mode should be `100755`.
 4. Confirm `python --version` works in the shell Claude Code uses. If only `py`
    resolves, change `"command": "python"` to `"command": "py"` in
-   `.claude/settings.json` — all three hook entries.
+   `.claude/settings.json` — there is one hook entry.
 5. Start `claude`. Session mode comes from your user settings (auto by default),
    not from this repo; Shift+Tab cycles modes.
    For planning: Shift+Tab into Plan Mode, run `/interview <app idea>`.
@@ -89,19 +49,14 @@ started there loads no project `CLAUDE.md`.
 
 ## Verify the guardrails before trusting them (5 minutes)
 
-Run the shell checks through **both** tools — `shell_guard.py` is registered for
-`Bash|PowerShell`, and PowerShell is the path that had no coverage before v4.
+Run the shell checks through **both** tools — PowerShell is the path that had no
+coverage before v4.
 
-> **Where the shell guard lives (handoff B2).** This template no longer ships
-> `scripts/hooks/shell_guard.py`. On the maintainer machine the identical guard
-> is registered once at **user level** in `~/.claude/settings.json`, which covers
-> every repo, so a project-level copy was pure duplication — two processes doing
-> the same work on every shell call. **Put-back trigger: if this template has to
-> work on a machine that does not have that `~/.claude` configuration, restore
-> the project-relative guard and its `Bash|PowerShell` registration before
-> relying on any shell claim below.** Without one of the two, none of the shell
-> bullets in this section hold, and the evaluator loses its shell allowlist.
-> See `docs/DECISIONS.md`.
+> **This template does not ship a shell guard (handoff B2).** `shell_guard.py` is
+> registered once at **user level** in `~/.claude/settings.json` on the maintainer
+> machine, which covers every repo including this one. On any machine without that
+> configuration, **none of the shell bullets below hold** and the evaluator loses its
+> shell allowlist. Put-back trigger and full reasoning: `docs/DECISIONS.md`.
 
 - `/hooks` shows the project PreToolUse hook matching `Edit|Write|MultiEdit`
   (plus the evaluator's own `Read|Grep|Glob` hook from its frontmatter, and the
@@ -111,8 +66,8 @@ Run the shell checks through **both** tools — `shell_guard.py` is registered f
   Write `SUPABASE_SERVICE_ROLE_KEY=eyJ<25 chars>` → blocked.
   Read `env.example` → allowed; `.env.example` → **denied**. Every `.env*` is
   secret with no exception, and the non-secret example file carries no leading
-  dot (handoff B3). `.gitignore`, `shell_guard.py` and `write_guard.py` all
-  agree on that; they used to disagree.
+  dot (handoff B3). `.gitignore` and `write_guard.py` agree on that; they used to
+  disagree.
 - Edit a file in `supabase/migrations/` → blocked. Edit `CLAUDE.md` → blocked.
 - `npm test` runs without a prompt. `git push` → asks you, in either shell.
 - Blocked in **both** shells: `git commit --no-verify` and its `-n` shorthand ·
@@ -134,18 +89,24 @@ Run the shell checks through **both** tools — `shell_guard.py` is registered f
   `gc` and `type` (commands are canonicalized before matching) ·
   `Set-Content supabase/migrations/001.sql` → blocked ·
   recursive `Remove-Item` → denied, single-file `Remove-Item` → allowed.
-- With a failing `npm run verify`, `git commit` → pre-commit rejects.
+- `package.json` with no `verify` script → `git commit` rejects. With a failing
+  `npm run verify` → rejects. Covered by `scripts/hooks/test_pre_commit.py`, which
+  tests the script's logic, not its installation — see residual gap 5.
 - Spawn the evaluator; have it try `echo x > src/a.ts` (bash) or
   `Set-Content src/a.ts 'x'` (PowerShell) → allowlist blocks both. **This one
   depends on a shell guard being registered somewhere** (see the B2 note above):
-  the evaluator allowlist lives inside `shell_guard.py`, so on a machine with no
-  user-level guard and no project copy, the evaluator has no shell containment
-  at all and this check silently passes the wrong way.
+  with no user-level guard and no project copy, the evaluator has no shell
+  containment at all and this check silently passes the wrong way.
 
 The `shell_guard` rules are covered by a block/allow case table in both
 directions — a rule that stops firing and a rule that over-matches each show up
 as a failure. Re-run it after editing any pattern. The suite lives beside the
 guard: `~/.claude/hooks/test_shell_guard.py` on this machine.
+
+The two guards this template *does* ship carry their own suites:
+`python scripts/hooks/test_write_guard.py` (and `--mutate`),
+`python scripts/hooks/test_evaluator_guard.py`, and
+`python scripts/hooks/test_pre_commit.py` (and `--mutate`).
 
 ## Version-sensitive (check once on your Claude Code version)
 Verified live 2026-08-24 on this machine; re-check after a Claude Code upgrade.
@@ -158,6 +119,8 @@ Verified live 2026-08-24 on this machine; re-check after a Claude Code upgrade.
 - `agent_type` in hook input inside subagents. It powers both the evaluator
   shell allowlist and the read guard. If absent, neither engages — and there is
   no longer a worktree behind them (see below).
+- `.claude/rules/` files scope by a `paths:` frontmatter key (not `globs:`) and load
+  only when a matching file is read.
 
 ## WORKSPACE TRUST GATES THE EVALUATOR'S READ ISOLATION
 `.claude/agents/evaluator.md` is a PROJECT-level definition, and Claude Code
@@ -205,13 +168,23 @@ which reads like a block and would make the probe lie.
    mount.
 2. Hooks fail open on their own bugs (by design, except allowlist matches).
    They stop drift, not a determined bypass.
-3. `shell_guard` sees a shell COMMAND STRING and treats all of it as commands,
-   so a heredoc writing a file whose text contains a blocked command is blocked.
-   Author files with Write/Edit rather than heredocs.
+3. `shell_guard` fails closed on a command it cannot parse — an unterminated quote
+   is refused and has to be rewritten. It judges operands, not payload: heredoc and
+   here-string bodies are stripped before parsing, so a file whose *text* contains a
+   blocked command can be authored with a heredoc. Redirect targets are still
+   operands, so `cat <<EOF > .env` still blocks. (This reverses an earlier documented
+   limit — see `docs/DECISIONS.md`.)
 4. Stack assumptions: `npm run verify`, Supabase/Postgres migration dirs. Edit
-   `write_guard.py` / `shell_guard.py` / `.githooks/pre-commit` for other stacks.
-4. Governance lock: the agent can't edit `.claude/`, `.githooks/`, `CLAUDE.md`.
-   You edit those manually — that's the point.
+   `write_guard.py` and `.githooks/pre-commit` for other stacks — and the
+   user-level `shell_guard.py`, if this machine has one.
+5. `.githooks/pre-commit` is drift control, not a trust boundary: a local hook is
+   bypassable, and in this template repo it is committed mode `100644` with
+   `core.hooksPath` unset, so it does not fire here at all. Its test suite covers
+   the script's logic, not its installation. CI is the real backstop and does not
+   exist yet.
+6. Governance lock: the agent can't edit `.claude/`, `.githooks/`, `CLAUDE.md`.
+   You edit those manually — that's the point, and it means template-maintenance
+   sessions hand you files to copy in.
 
 ## Put-back triggers (add complexity only on evidence from a real build)
 - Sessions keep ending with a dirty tree → restore the v2 Stop hook
@@ -219,6 +192,10 @@ which reads like a block and would make the probe lie.
 - Evaluator keeps finding P1s in "ordinary" features → evaluate every feature.
 - SPEC drift bites twice → per-feature mini-plan in Plan Mode before building
   high-risk features (not a contracts directory).
+- Template maintenance needs more than two sessions in a month → design a maintainer
+  mode rather than weakening `write_guard.py`.
+- Mockups do not reduce UI rework across three UI-bearing features → delete the
+  mockup step from `/interview`.
 - Retro is by evidence, not by scaffold: after each shipped app, one build =
   proposal, repeated evidence = template default. No retro step lives in any
   command or CLAUDE.md.

@@ -1,12 +1,40 @@
 #!/usr/bin/env bash
-# Native git layer: red code cannot be committed, regardless of which agent
-# (or human) runs `git commit`. Installed by: git config core.hooksPath .githooks
-# (/new-app does this at step 2; shell_guard blocks repointing it and blocks
-# --no-verify, in both the Bash and PowerShell tools).
+# Fast local drift control, not a trust boundary. A local hook is bypassable
+# (--no-verify, or repointing core.hooksPath), so it stops drift, not a
+# determined bypass; CI is the backstop.
+# Installed by: git config core.hooksPath .githooks
 set -euo pipefail
-if [ -f package.json ] && grep -q '"verify"' package.json; then
-  echo "[pre-commit] npm run verify..."
-  npm run verify
-else
-  echo "[pre-commit] no verify script yet (pre-foundation) — allowing commit."
+
+if [ ! -f package.json ]; then
+  echo "[pre-commit] no package.json yet (pre-foundation) - allowing commit."
+  exit 0
 fi
+
+# Which check ran is printed, because the two are not equally precise: the grep
+# fallback cannot tell a scripts.verify entry from a dependency named "verify".
+if command -v node >/dev/null 2>&1; then
+  check="node"
+  set +e
+  node -e 'let p;try{p=require("./package.json")}catch(e){process.exit(2)};process.exit((p.scripts||{}).verify?0:1)'
+  rc=$?
+  set -e
+  if [ "$rc" -eq 2 ]; then
+    echo "[pre-commit] package.json exists but could not be parsed as JSON." >&2
+    exit 1
+  fi
+else
+  check="grep"
+  set +e
+  grep -Eq '"verify"[[:space:]]*:' package.json
+  rc=$?
+  set -e
+fi
+
+if [ "$rc" -ne 0 ]; then
+  echo "[pre-commit] verify script missing: package.json defines no \"verify\" script (checked with: $check)." >&2
+  echo "[pre-commit] Add one, or make this commit before package.json exists." >&2
+  exit 1
+fi
+
+echo "[pre-commit] npm run verify... (verify found via: $check)"
+npm run verify

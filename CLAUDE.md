@@ -1,24 +1,75 @@
 # Project Rules — Plan → Build → Evaluate
 
 Global `~/.claude/CLAUDE.md` applies. Its hard stops (commit/push only when asked,
-show before delete/overwrite, secrets only in `.env`, verification must be able
-to fail) are not repeated here and are never overridden.
+the delete/overwrite boundary, secrets only in `.env`, verification must be able to
+fail) are not repeated here and are never overridden.
 
 ## Workflow
-1. **PLAN** — for a new app or any feature that doesn't fit in one sentence:
-   enter Plan Mode (Shift+Tab twice) and run `/interview`. Output is
-   `docs/SPEC.md` — the single source of truth for what to build.
-2. **BUILD** — in the main session, one SPEC feature at a time, in SPEC order.
-   Read `docs/SPEC.md` and `docs/PROGRESS.md` before touching anything. If
-   implementation proves SPEC.md materially wrong: stop, amend SPEC.md, then
-   resume — never silently diverge. Unrelated discoveries go to
+1. **PLAN** — route by size, and count the approvals:
+   - **New app, or a change to architecture** → Plan Mode (Shift+Tab twice), run
+     `/interview`. Two approvals: the direction, then the final `docs/SPEC.md`.
+   - **A feature** → `/interview`, which detects feature mode from an existing
+     `docs/SPEC.md` and amends it with one feature entry. One approval.
+   - **A one-sentence reversible change** → build it directly. No approval, no
+     `/interview`.
+
+   `docs/SPEC.md` is the single source of truth for what to build.
+
+2. **BUILD** — in the main session, one SPEC feature at a time, in SPEC order. Read
+   `docs/SPEC.md` before touching anything.
+
+   For each SPEC feature:
+   ```
+   read its requirements and acceptance criteria
+   implement the thinnest correct version
+   run the feature's acceptance checks
+   red → diagnose, fix, rerun; do not ask
+   UI added or changed → visually verify (below)
+   evaluator trigger present → one evaluator run for the whole feature;
+     fix P1 automatically; stop only for P0
+   mark complete; add its row to the docs/PROGRESS.md metric log;
+     immediately start the next feature; do not ask
+   ```
+
+   **Feature 1 is a walking skeleton**: the thinnest end-to-end usable path through
+   UI → API → data (→ auth if relevant). If dependencies genuinely prevent that,
+   Feature 2 must be. If there is still no end-to-end path after Feature 2, stop and
+   amend SPEC.md.
+
+   **Stop during BUILD only for:** material SPEC invalidation (stop, amend SPEC.md,
+   then resume — never silently diverge) · an irreversible external action · a
+   genuinely expensive-to-reverse decision the SPEC did not settle · evaluator P0 ·
+   release or push · the production gate below · the delete/overwrite boundary as
+   defined in global `~/.claude/CLAUDE.md`. Nothing else. Unrelated discoveries go to
    `docs/BACKLOG.md`; stay on the current intent.
-3. **EVALUATE** — dispatch the `evaluator` subagent after: the first vertical
-   slice · any feature touching auth, authorization/RLS, money/billing, or
-   migrations · before release. Its task prompt contains ONLY: which SPEC.md
-   features are in scope and how to run the app. Never describe how anything
-   was built. Save its report verbatim to `docs/evals/eval-NN.md`.
-   P0 → stop, tell the human. P1 → fix before continuing. P2 → BACKLOG.md.
+
+   **Production gate — the one exception to zero build-time approvals.** For any app
+   with real users (`pure-eq`), before executing any operation that can modify
+   existing production user data or change auth/RLS behaviour — a migration, a repair
+   script, a policy edit, anything — show it and wait.
+
+   **Visual verification.** Requires browser tooling (Claude in Chrome or equivalent).
+   If it is not available in this session, say so and skip it — do not substitute a
+   prose description and call the screen verified. When it is available: start
+   localhost → open the page at the target viewport → screenshot → compare against the
+   approved mockup → exercise one key state.
+
+3. **EVALUATE** — dispatch the `evaluator` subagent when the feature carries a trigger.
+
+   **Always:** the first vertical slice · authentication, authorization, or RLS ·
+   money or billing · a destructive or data-transforming migration · a migration
+   touching existing production rows · any migration creating a table that will hold
+   user data, regardless of how many rows it holds today · pre-release.
+
+   **Not a trigger by default:** an additive migration on a table that holds no user
+   data.
+
+   Multiple triggers in one feature = **one** evaluator run for the whole feature.
+
+   Its task prompt contains ONLY: which SPEC.md features are in scope and how to run
+   the app. Never describe how anything was built. Save its report verbatim to
+   `docs/evals/eval-NN.md`. P0 → stop, tell the human. P1 → fix before continuing.
+   P2 → BACKLOG.md.
 
    Immediately BEFORE dispatching, run `git status --porcelain` and record the
    exact output. The evaluator runs in the real working tree so that it sees
@@ -35,10 +86,10 @@ to fail) are not repeated here and are never overridden.
 - Load the `engineering-conventions` skill before schema, auth, money, or
   migration work.
 - Self-test with the falsifiability check before claiming done (see skill).
-- Session end: `npm run verify` green, or work stashed with the reason in
-  PROGRESS.md. Always append to `docs/PROGRESS.md`: date · what was done ·
-  state (verify GREEN / STASHED + why) · next step specific enough for a cold
-  session. Commit only when the human approves.
+- Session end: `npm run verify` green, or work stashed. Handoff state has one owner —
+  `session-context.md`, whose trigger and format are defined in
+  `~/.claude/commands/save-context.md`. `docs/PROGRESS.md` is not a handoff: it holds
+  shipped milestones and the metric log. Commit only when the human approves.
 
 ## Guardrails (deterministic — do not weaken)
 Which layer enforces what, because they are not the same layer:
@@ -55,10 +106,12 @@ Which layer enforces what, because they are not the same layer:
   force pushes, and recursive deletes — and it holds the evaluator's shell
   allowlist. On a machine without that user-level guard, none of those are
   blocked. See `docs/DECISIONS.md` for the put-back trigger.
+- `.githooks/pre-commit` runs `npm run verify` when the project defines one, and
+  fails the commit if `package.json` exists without one. It is fast local drift
+  control, not a trust boundary: a local hook is bypassable, so CI is the backstop.
+- `.claude/`, `.githooks/`, and this file change only via the human.
 
 Safe operations are deliberately NOT blocked: `git reset HEAD file`,
 `rm file.txt`, `Remove-Item file.txt`, reading and writing `env.example`.
 Over-blocking is a framework defect, not caution. If a hook blocks you, fix the
 approach — never work around it.
-- `.githooks/pre-commit` runs `npm run verify`; red code cannot be committed.
-- `.claude/`, `.githooks/`, and this file change only via the human.

@@ -23,3 +23,9 @@ Thumbs.db
 # Python bytecode
 __pycache__/
 *.pyc
+
+# Session handoff — local working state, not project history. Written by
+# /save-context, read by /resume-context, overwritten whole each time. There is no
+# archive directory: archiving was removed as ceremony (~/.claude/DECISIONS.md,
+# 2026-08-25), so nothing produces one to ignore.
+session-context.md

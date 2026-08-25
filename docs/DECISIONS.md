@@ -6,6 +6,117 @@ Inclusion test: record it only if a future session would reasonably ask
 
 ---
 
+## 2026-08-25 — Template P0 pass: routing, build loop, context ownership, truthfulness
+
+One session, one intent: reduce interruptions and remove claims the framework cannot
+support. Grouped rather than split because they were decided together.
+
+**Template-maintenance sessions pay five manual file copies.** `write_guard.py` locks
+`.claude/`, `.githooks/` and `CLAUDE.md` (`GOVERNANCE`, line 30), so a session whose
+whole purpose is editing the framework hands those files to the human instead of
+writing them. This session staged five complete files plus one PowerShell script that
+copies them and hash-compares each. Accepted: the framework-freeze rule makes these
+sessions rare, and the alternative — disarming the guard for the duration — is the
+agent editing its own governance. **Put-back trigger:** more than two maintenance
+sessions in one calendar month. Then design a maintainer mode — a scoped, auditable
+exception. Do not weaken the guard before then.
+
+**Planning routes by size, with the approval count stated as a number.** New app or
+architecture change = 2 approvals; a feature = 1; a one-sentence reversible change =
+0, and no `/interview` at all. Previously every feature that "doesn't fit in one
+sentence" paid the full three-phase interview, which made skipping planning entirely
+the cheap path. `/interview` now detects its mode from whether `docs/SPEC.md` exists,
+and feature mode is forbidden from touching Part 1 or any other feature's entry.
+**Put-back trigger:** if feature mode ships a feature whose architecture impact should
+have escalated, tighten the escalation rule — do not merge the modes back.
+
+**One mockup, not three, and only when a screen changes.** The UI block is four
+questions in one batch; its output is a short block inside the SPEC feature entry,
+never a separate document, and it rides inside an existing approval rather than adding
+a gate. **KILL CRITERION:** after three UI-bearing features, if mockup approval has
+not reduced post-build UI rework (the `rework` column in `docs/PROGRESS.md`), delete
+the mockup step. It is a cost until it is shown not to be.
+
+**Evaluator triggers are named by effect, not by the word "migration".** "Any
+migration" over-fired on additive columns and under-fired on a table created empty
+that would hold user data a week later. The list now keys on what the change can do:
+first vertical slice, auth/authz/RLS, money, destructive or data-transforming
+migrations, migrations touching existing production rows, any migration creating a
+table that will hold user data regardless of current row count, and pre-release.
+Multiple triggers in one feature = one run. **Re-scope on evidence:** ~20 optional
+evals with zero unique P0/P1 findings → narrow the list. Two serious defects escaping
+unevaluated work → broaden it.
+
+**`.githooks/pre-commit` is drift control, not a trust boundary — and now says so.**
+It claimed "red code cannot be committed", which a local hook cannot guarantee
+(`--no-verify`, repointing `core.hooksPath`); that was `BACKLOG` C7. It also
+fail-opened when `package.json` existed with no `verify` script — precisely the state
+where a project has verification and is not running it. Now: no package.json → allow;
+package.json without `verify` → fail; with `verify` → run it. Detection is `node -e`
+parsing `scripts.verify`, because the old `grep -q '"verify"'` was satisfied by a
+*dependency* named `verify`. **Residual limit, stated rather than hidden:** when
+`node` is absent the hook falls back to `grep -Eq '"verify"[[:space:]]*:'`, which
+still cannot separate `scripts.verify` from a dependency key; the hook prints which
+check ran, so the weaker answer is never silent. Covered by
+`scripts/hooks/test_pre_commit.py`: 6 behaviour cases, 5 contract assertions, and a
+mutation that restores the fail-open branch and must turn exactly two cases red.
+
+**Handoff state has one owner: `session-context.md`.** `CLAUDE.md` previously required
+reading `docs/PROGRESS.md` before touching anything and appending a next-action to it
+every session — the same job `/save-context` already does, into a file the evaluator
+is deliberately blocked from reading. `docs/PROGRESS.md` is now shipped milestones
+plus the metric log (one row per feature: started_at, green_at, human_stops, rework,
+defects_after_green), which is the instrument for the governing metric. Its dangling
+`progress-hygiene` reference is gone — no such skill exists in this repo or in
+`~/.claude`. `session-context.md` is now gitignored; nothing ignored it before, so it
+was committable.
+
+**`.archive/` deliberately NOT added to `.gitignore`.** It was proposed alongside
+`session-context.md`, but `~/.claude/DECISIONS.md` (2026-08-25, P0 config pass)
+records archiving, the 20-snapshot retention, category detection and the 14-day prune
+as deleted ceremony — `/save-context` overwrites one file whole and creates no
+archive. An ignore rule for a directory nothing produces is dead config that reads as
+coverage. **Put back if** a producer of `.archive/` is ever added.
+
+**Visual verification is conditional on browser tooling being present.** Claude in
+Chrome was confirmed available on this machine (one local extension, Windows), so the
+sequence — start localhost, open the page at the target viewport, screenshot, compare
+against the approved mockup, exercise one key state — is written into the BUILD loop.
+But `CLAUDE.md` ships to every app scaffolded from this template, including machines
+without the extension, so the rule carries its precondition and says to skip and
+report rather than substitute a prose description. Asserting the tools exist would
+have added a false claim in the same pass that removed seven.
+
+**`add-*` knowledge extracted; the four commands are now safe to delete.**
+`~/.claude/DECISIONS.md` (2026-08-25) gated deletion of `add-table`, `add-endpoint`,
+`add-page` and `add-webhook` on a session verifying their knowledge had been
+extracted. This was that session. Failure-preventing rules moved into
+`.claude/skills/engineering-conventions/SKILL.md` — the `set_updated_at` ordering
+dependency, `archived_at` obligations, partial unique indexes, fail-loud UNIQUE
+creation, RLS policies in the creating migration, the seven-step handler order with
+its gate exclusions, and the webhook raw-body → verify → parse → replay → dispatch →
+mutate → ack protocol — and into `.claude/rules/react-traps.md` (Strict-Mode
+double-invocation, wizard-step keying, setState-then-submit, progressive save,
+gate-preserve). Workflow steps, "Verify" sections, and anything already carried by
+`~/.claude/REVIEWER_CONVENTIONS.md` §6 were dropped rather than copied. Deleting the
+four files still requires repairing `~/.claude/commands/new-app.md`, whose frontmatter
+description names three of them.
+
+**`env.example` created, because the README told you to verify a file that did not
+exist.** Four files cite it — `.gitignore`, `CLAUDE.md`, `README.md` and this one — and
+the README's guardrail check says "Read `env.example` → allowed". There was no such
+file in the repo, so that check could not pass. Same class of defect as the fail-open
+pre-commit fixed in this pass: a verification step that cannot fail measures nothing.
+It ships with empty values and one comment per key; a filled-in value here would be a
+committed secret, and this repo is public.
+
+**`.claude/rules/` is a real mechanism and its frontmatter key is `paths`, not
+`globs`.** Verified against the Claude Code memory documentation before use: a rule
+carrying `paths` loads only when a matching file is read. This is the first rules file
+in the template.
+
+---
+
 ## 2026-08-24 — The shell guard is registered once, at user level, not per project (handoff B2)
 
 Context: `scripts/hooks/shell_guard.py` and `~/.claude/hooks/shell_guard.py` were
