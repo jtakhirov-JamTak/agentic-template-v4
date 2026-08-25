@@ -102,6 +102,24 @@
   regression, but a documented agent workflow that breaks. It was updated to
   `env.example` in the same commit as the rename, along with `CLAUDE.md:46`.
 
+- **[B2 consequence — MITIGATED 2026-08-25] The evaluator now detects a missing shell
+  guard itself.** Step 0b runs `python -c "print('evaluator shell probe')"`, which the
+  evaluator allowlist rejects: blocked means shell containment is live, and if it
+  actually prints, the evaluator aborts with **P0 HARNESS FAILURE** instead of grading.
+  The command is inert by construction — if the guard is dead and it does run, it
+  prints one line and touches no file, Git state, environment or network. That matters
+  because the wording it replaced told the evaluator to probe with
+  `echo x > /tmp/probe`, which WRITES A FILE when the guard is dead, i.e. causes the
+  exact mutation the evaluator is forbidden to make; a contract test now blocks that
+  line from returning. Proven both directions: `test_shell_guard.py` asserts the probe
+  blocks for the evaluator and stays inert for every other agent, and the
+  `eval-shell-allowlist-off` mutation turns exactly those cases red — that is the
+  SUCCEEDS branch. Four contract assertions in `test_evaluator_guard.py` pin the
+  instruction, each verified to fail when `evaluator.md` is broken in its specific way.
+  **Still OPEN underneath:** the probe reports the failure, it does not prevent it, and
+  it covers only the evaluator — an ordinary session on a machine with no user-level
+  guard still has no shell containment and nothing to notice it. The put-back trigger
+  in `docs/DECISIONS.md` remains the real fix.
 - **[B2 consequence] Nothing asserts that a shell guard is registered anywhere.**
   `test_evaluator_guard.py`'s contract checks cover `evaluator.md` frontmatter only,
   and no suite ever asserted the settings-level `Bash|PowerShell` registration. Now

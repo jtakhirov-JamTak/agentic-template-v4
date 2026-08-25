@@ -160,6 +160,49 @@ def contract_checks():
                 "agent body performs the Step 0 self-probe", ""))
     out.append(("P0 HARNESS FAILURE" in body,
                 "agent body defines the abort path when the probe SUCCEEDS", ""))
+
+    # --- Step 0b: the SHELL self-probe ---------------------------------------
+    # The Read probe above cannot detect a missing shell guard: evaluator_guard.py
+    # is project-relative and ships with this repo, while the shell allowlist
+    # lives in shell_guard.py at user level, which this repo does NOT ship. So a
+    # checkout on another machine passes 0a with no shell containment at all.
+    # These assert the instruction exists and is safe; the BLOCK behaviour itself
+    # is asserted in ~/.claude/hooks/test_shell_guard.py, where the guard lives.
+    SHELL_PROBE = "python -c \"print('evaluator shell probe')\""
+    out.append((SHELL_PROBE in body,
+                "agent body carries the Step 0b shell probe verbatim",
+                SHELL_PROBE))
+    # The probe only means something if its command is NOT on the allowlist --
+    # a permitted command would "pass" every time and prove nothing. That is
+    # asserted where the allowlist actually lives, by the case
+    # `eval STEP 0b shell probe blocked` in ~/.claude/hooks/test_shell_guard.py:
+    # add `python` to EVAL_ALLOWED_BASH and that case goes red immediately.
+    # Mirroring the allowlist into this repo instead would just rot, since
+    # shell_guard.py is not shipped here (handoff B2).
+    out.append((SHELL_PROBE.split()[0] == "python",
+                "probe head is the command the shell suite pins as non-allowlisted",
+                SHELL_PROBE.split()[0]))
+    # Inertness: if the guard is dead the probe DOES run, so it must not be able
+    # to change anything. No redirection, no mutation verb, no network.
+    unsafe = [t for t in (">", ">>", "|", "rm ", "mv ", "cp ", "touch ", "tee ",
+                          "curl ", "wget ", "git ", "npm ", "os.", "open(",
+                          "subprocess", "shutil", "unlink", "write")
+              if t in SHELL_PROBE]
+    out.append((not unsafe,
+                "the probe is inert if it accidentally runs",
+                f"unsafe tokens: {unsafe}"))
+    # Both branches must be spelled out, or the evaluator does not know what to
+    # do with either outcome.
+    lower = body.lower()
+    out.append(("shell containment is active" in lower,
+                "0b defines the BLOCKED branch (containment live -> continue)", ""))
+    out.append(("shell containment is inactive" in lower,
+                "0b defines the SUCCEEDS branch (-> P0 HARNESS FAILURE abort)", ""))
+    # The old wording told the evaluator to probe with `echo x > /tmp/probe`,
+    # which WRITES A FILE if the guard is dead -- a probe that causes the very
+    # mutation the evaluator is forbidden to make. It must not come back.
+    out.append(("echo x > /tmp/probe" not in body,
+                "no mutating shell probe is instructed", ""))
     out.append(("git status --porcelain" in body,
                 "porcelain protocol present in the agent body", ""))
     out.append(("--untracked-files=no" not in body.replace(

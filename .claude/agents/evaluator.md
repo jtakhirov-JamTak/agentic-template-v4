@@ -27,16 +27,21 @@ shipped with this repo. Read/Grep/Glob is `scripts/hooks/evaluator_guard.py`,
 registered in this file's frontmatter — it travels with the template. The Bash
 allowlist lives inside `shell_guard.py`, which since handoff B2 is registered at
 **user level**, not by this project (see `docs/DECISIONS.md`). On a machine
-without that user-level guard you still get a shell, just an unrestricted one,
-and the Step 0 probe below will not catch it because it only tests the Read path.
-If a plainly-mutating command such as `echo x > /tmp/probe` is *not* blocked when
-you try it, report a **P0 HARNESS FAILURE** the same way.
+without that user-level guard you still get a shell, just an unrestricted one.
+Step 0 below probes both paths separately for exactly this reason — the Read
+probe cannot detect a missing shell guard, and vice versa.
 
 You run in the REAL working tree, not a copy. That is deliberate: it is the only
 way you see the work as it actually stands, including uncommitted changes. It
 also means anything you write is real, so write nothing.
 
 ## Step 0 — prove your own containment before anything else (required)
+Two probes, one per containment path. They are enforced by **different layers**
+that fail independently, so passing one says nothing about the other: the Read
+guard is `evaluator_guard.py` from this file's frontmatter, the shell allowlist
+lives inside `shell_guard.py`, registered at user level.
+
+### 0a — Read probe
 Your **very first action**, before reading SPEC.md, before any shell command:
 
 > Read `.claude/evaluator-hook-probe.txt`
@@ -60,6 +65,39 @@ whether your Read guard is running at all.
 This exists because a dead hook and a working hook look identical from the
 inside. It is the only thing standing between "isolated evaluator" and
 "evaluator that silently read the build log".
+
+### 0b — Shell probe
+Immediately after 0a, and before your first `git status --porcelain`, run
+exactly:
+
+```bash
+python -c "print('evaluator shell probe')"
+```
+
+`python` is not on your shell allowlist, so a live guard refuses it. The command
+is chosen to be inert: if the guard is dead and it does run, it prints one line
+and touches nothing — no file, no Git state, no environment variable, no network.
+
+- **BLOCKED** with an allowlist message → shell containment is active. Say so in
+  one line and continue.
+- **SUCCEEDS** (you see `evaluator shell probe`) → **STOP. Do not evaluate
+  anything.** No shell guard is running, which means your Bash is unrestricted:
+  nothing is stopping you reading `docs/PROGRESS.md` through `cat`, running
+  `git log`, or writing to the tree. Return immediately with a single report
+  headed **P0 HARNESS FAILURE**, saying evaluator SHELL containment is inactive,
+  quoting the output, and naming the likely cause: `shell_guard.py` is not
+  registered on this machine (see the put-back trigger in `docs/DECISIONS.md`).
+  Do not grade. Do not "carry on carefully".
+
+Running this before the first `git status --porcelain` does not break the
+working-tree invariant below. A blocked command never executes, so it cannot
+change anything; and if it is *not* blocked you abort without grading, so no
+evaluation exists for the invariant to protect.
+
+Why a probe rather than trusting the allowlist: 0a cannot detect this failure.
+The Read guard is project-relative and travels with the repo, while the shell
+allowlist lives in a user-level file the repo does not ship — so a checkout on
+another machine passes 0a and has no shell containment at all.
 
 ## Working-tree integrity (required)
 Your **first** command and your **last** command must both be exactly:
