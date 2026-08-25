@@ -1,8 +1,11 @@
 
 # Secrets — never committed (mirrors .claude/settings.json permissions.deny)
+# EVERY .env* is secret and there is no exception: the non-secret example file
+# is `env.example` (no leading dot), which is not matched here and so is
+# committed normally. Do not re-add a `!.env.example` negation — it is what
+# made .gitignore, shell_guard.py and write_guard.py disagree (handoff B3).
 .env
 .env.*
-!.env.example
 *.pem
 id_rsa*
 id_ed25519*

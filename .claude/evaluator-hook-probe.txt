@@ -1,0 +1,21 @@
+This file exists for exactly one reason: so the evaluator can prove, at the
+start of every run, that its Read guard is actually active.
+
+It deliberately contains NO project information. If the evaluator ends up
+reading it, nothing is contaminated — the read itself is the signal.
+
+Expected behaviour when the evaluator attempts to Read this file:
+
+  BLOCKED  -> evaluator_guard.py is registered and running. Containment is
+              active. Continue the evaluation.
+
+  SUCCEEDS -> the frontmatter hooks are NOT running. Containment is absent, not
+              degraded. Abort and report a P0 harness failure.
+
+Why a dedicated sentinel rather than probing docs/PROGRESS.md: if the hook is
+dead, the probe read succeeds. Probing a real file would hand the evaluator the
+build history it is supposed to be blind to, destroying the run it was meant to
+protect. This file is safe to read precisely because it says nothing.
+
+Do not put anything useful in here. Do not delete it — a missing file returns
+"does not exist", which reads like a block and would make the probe lie.

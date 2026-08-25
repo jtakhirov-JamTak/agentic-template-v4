@@ -6,6 +6,50 @@ Inclusion test: record it only if a future session would reasonably ask
 
 ---
 
+## 2026-08-24 — The shell guard is registered once, at user level, not per project (handoff B2)
+
+Context: `scripts/hooks/shell_guard.py` and `~/.claude/hooks/shell_guard.py` were
+byte-identical (sha256 `d50bafc230245794…`), and both were registered for
+`Bash|PowerShell`. Every shell call in a template-derived repo therefore paid for
+**two** Python processes running the same parser over the same string.
+
+**Measured.** One guard invocation: **66 ms median** on Bash (42 ms of that is
+bare `python -c pass` startup, so ~24 ms is the guard). Duplicated, that is
+~132 ms per shell call for zero additional protection.
+
+**Done.** Deleted `scripts/hooks/shell_guard.py`, `scripts/hooks/test_shell_guard.py`,
+and the project `Bash|PowerShell` registration in `.claude/settings.json`. The
+user-level guard covers every repo on this machine, including this template, and
+was verified firing from the template working directory — destructive git forms
+blocked, `git status` allowed, and the full evaluator allowlist still enforced
+(`echo >`, `git log`, `cat docs/PROGRESS.md`, non-allowlisted binaries all
+blocked; `npm test` and `git status --porcelain` allowed).
+
+**Scope of the claim — read this before trusting it.** "The user-level guard
+protects all repos" is true *of this machine only*. It is a statement about
+`~/.claude/settings.json`, not about the template. A checkout of this template
+on any other machine now has **no shell guard whatsoever**.
+
+**PUT-BACK TRIGGER.** Restore `scripts/hooks/shell_guard.py`, its test suite, and
+the `Bash|PowerShell` registration when **any** of these becomes true:
+
+1. the template must work on a machine without this `~/.claude` configuration
+   (another person, another laptop, a fresh OS install, a container, CI);
+2. a generated app needs guard coverage that does not depend on the developer's
+   personal config;
+3. the evaluator is dispatched anywhere the user-level guard is not installed —
+   **this is the sharp edge**: the evaluator's shell allowlist lives *inside*
+   `shell_guard.py`, so with no guard registered the evaluator keeps `tools: Bash`
+   and gains an unrestricted shell. Its read isolation (`evaluator_guard.py`) is
+   project-relative and survives; its *shell* isolation does not. A P0 harness
+   failure that the Step 0 read probe does **not** detect, because that probe
+   only tests the Read path.
+
+Recovery is `git show 4d2c989 -- scripts/hooks/shell_guard.py`; nothing unique
+was lost, since the deleted bytes are exactly the surviving user-level copy.
+
+---
+
 ## 2026-08-23 — Permission and hook scope: what was changed and what was left alone
 
 Context: the guardrail layer was written for the Bash tool only. On Windows the
