@@ -8,9 +8,12 @@
   registration. Measured (interleaved, n=10): **528 ms median on every Edit/Write**
   even for a file it declines to format, 853 ms in a Prettier project — against a
   253 ms bare-PowerShell floor. Formatting now happens only at the verification /
-  pre-commit boundary; proved live in `dev/app-foundation`, where `npm run verify`
-  starts with `format:check` — green on the clean tree, and **red** on a deliberately
-  unformatted file (the failing input that makes the check mean something).
+  pre-commit boundary. Proved live at the time in a Prettier-using project whose
+  `npm run verify` begins with `format:check`: green on a clean tree, and **red** on a
+  deliberately unformatted file — the failing input that makes the check mean
+  something. **That project has since been retired and deleted**, so the evidence is
+  no longer independently re-runnable; re-prove it in whichever app adopts Prettier
+  next rather than treating this line as standing proof.
 - **[B2 — RESOLVED] Template `shell_guard.py` + `test_shell_guard.py` + the project
   `Bash|PowerShell` registration deleted.** Both files were byte-identical to the
   user-level copy (sha256 `d50bafc2…`, `5bffed9e…`), so a template repo paid two
@@ -68,47 +71,36 @@
   what proves the rule matched rather than the file merely being absent. B3's "every
   `.env*` is secret" now holds globally, not just inside a template-derived project.
 
-- **[B3 migration — DONE 2026-08-24, uncommitted in all five repos] `.env.example` →
-  `env.example` + all references updated.** Applied mechanically across `pure-eq`,
-  `the-leaf-v2`, `you-inc`, `PurePath`, `dev/app-foundation`. Every rename recorded by
+- **[B3 migration — DONE 2026-08-24, committed and pushed in all four app repos]
+  `.env.example` → `env.example` + all references updated.** Applied mechanically
+  across `pure-eq`, `the-leaf-v2`, `you-inc` and `PurePath`. Every rename recorded by
   git as `R100` (content byte-identical); every edit byte-preserving apart from the
   filename itself. Verified afterwards: zero tracked references to the dotted name in
   any repo, and each renamed file is genuinely usable — shell read/write allowed and
   `write_guard` accepts its ACTUAL contents (they carry placeholder credentials, so
   this was a real risk of swapping one over-block for another), while a real
-  `sk_live_` key in the same file still blocks. **Left staged, not committed.**
-  The original finding, for context:
+  `sk_live_` key in the same file still blocks.
 
-  Read-only compatibility scan run 2026-08-24 across all tracked files in all five
+  Read-only compatibility scan run 2026-08-24 across all tracked files in all four
   repos (`git ls-files` + in-process grep; a shell `grep .env.example` is itself
   blocked by the guard). Result: **zero runtime file access, zero `package.json`
-  scripts, zero CI/deploy references.** Three of the five repos do have
-  `.github/workflows/ci.yml`, and none of them names the file — so that zero is a
+  scripts, zero CI/deploy references.** Two of the four repos do have
+  `.github/workflows/ci.yml`, and neither names the file — so that zero is a
   real negative, not a vacuous one. Every surviving reference is prose, a comment, a
-  `.gitignore` negation, or a Claude rule. The rename is mechanical in all five.
+  `.gitignore` negation, or a Claude rule. The rename was mechanical in all four.
 
   Per repo — refs beyond the file itself:
   - `pure-eq` (4): `.gitignore:71` negation · `README.md:8` (`cp .env.example .env.local`)
     · `docs/Engineering_Playbook.txt:290,875`
-  - `the-leaf-v2` (0) and `PurePath` (0): the file only, nothing references it
+  - `the-leaf-v2` (0) and `PurePath` (0): the file only, nothing referenced it
   - `you-inc` (6): `.gitignore:71` · `README.md:8` ·
     `docs/Engineering_Playbook.txt:290,875` · **`CLAUDE.md:46,118`**
-  - `app-foundation` (8): `.gitignore:25` · `README.md:60` · `START_NEW_APP.md:21` ·
-    `docs/DECISIONS.md:162` · `.claude/commands/deploy-check.md:85,195` ·
-    `.claude/commands/worktree.md:37` · `src/lib/env/preconnect-origin.ts:11`
-    (a comment, not a read — the only source-file hit and it is inert)
 
-  **The one thing that is not just a rename:** `you-inc/CLAUDE.md:118` instructs the
-  agent to *"edit `.env.example` instead"* of touching `.env.local`. Once
-  `Read(~/**/.env.*)` is live that instruction cannot be followed — not a code
-  regression, but a documented agent workflow that breaks. That line must be updated
-  to `env.example` in the same change as the rename, not after it. `CLAUDE.md:46`
-  is the same file and cheap to fix alongside.
-
-  **Not done in Session B** — that session is harness/template scope; these are five
-  separate repos and `pure-eq` is the only app with real users. Each needs its own
-  scope: `git mv .env.example env.example`, drop the now-dead `!.env.example`
-  negation, update the reference lines above, re-run that app's verify.
+  **The one thing that was not just a rename:** `you-inc/CLAUDE.md:118` instructed the
+  agent to *"edit `.env.example` instead"* of touching `.env.local`. With
+  `Read(~/**/.env.*)` live that instruction cannot be followed — not a code
+  regression, but a documented agent workflow that breaks. It was updated to
+  `env.example` in the same commit as the rename, along with `CLAUDE.md:46`.
 
 - **[B2 consequence] Nothing asserts that a shell guard is registered anywhere.**
   `test_evaluator_guard.py`'s contract checks cover `evaluator.md` frontmatter only,
