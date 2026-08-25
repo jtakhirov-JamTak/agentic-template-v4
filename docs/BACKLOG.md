@@ -2,6 +2,14 @@
 
 (Deferred work, production issues, non-blocking findings. One line per item.)
 
+## Found during the template P0 pass (2026-08-25), not fixed there
+
+- **No app was ever scaffolded via `new-app.ps1`** — all four predate it (Feb-Jun
+  2026) and shipped with no pre-commit, no `hooksPath`, no `write_guard`, no
+  evaluator. `pure-eq` (real users) is being adopted manually in a separate session.
+  The other three are unprotected; install pre-commit only on those still receiving
+  commits.
+
 ## Resolved in Session B (2026-08-24)
 
 - **[B1 — RESOLVED] `format-after-edit.ps1` deleted**, with its PostToolUse
