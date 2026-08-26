@@ -7,11 +7,14 @@ fail) are not repeated here and are never overridden.
 ## Workflow
 1. **PLAN** — route by size, and count the approvals:
    - **New app, or a change to architecture** → Plan Mode (Shift+Tab twice), run
-     `/interview`. Two approvals: the direction, then the final `docs/SPEC.md`.
+     `/interview`. Two approvals: the direction, then the final `docs/SPEC.md`. Then
+     a fresh session to build — the one handoff worth its cost.
    - **A feature** → `/interview`, which detects feature mode from an existing
-     `docs/SPEC.md` and amends it with one feature entry. One approval.
+     `docs/SPEC.md` and amends it with one feature entry. One approval, and then it
+     builds **in the same session**. A fresh session there is an exception `/interview`
+     may recommend on evidence, never a routine step.
    - **A one-sentence reversible change** → build it directly. No approval, no
-     `/interview`.
+     `/interview` — BUILD opens the metric row itself.
 
    `docs/SPEC.md` is the single source of truth for what to build.
 
@@ -21,15 +24,40 @@ fail) are not repeated here and are never overridden.
    For each SPEC feature:
    ```
    read its requirements and acceptance criteria
+   no metric row open for this feature (direct build, no /interview)
+     → open it now, before any code: started_at = now UTC, green_at = —
    implement the thinnest correct version
    run the feature's acceptance checks
    red → diagnose, fix, rerun; do not ask
    UI added or changed → visually verify (below)
    evaluator trigger present → one evaluator run for the whole feature;
      fix P1 automatically; stop only for P0
-   mark complete; add its row to the docs/PROGRESS.md metric log;
-     immediately start the next feature; do not ask
+   everything above actually passed → close the row: green_at = now UTC,
+     cycle_time = green_at - started_at
+   mark complete; immediately start the next feature; do not ask
    ```
+
+   **The metric log measures elapsed real time, so it is opened before the work and
+   closed after it — never reconstructed once the feature is done.** One row per
+   feature in `docs/PROGRESS.md`; at most one open (`green_at` = `—`) at a time.
+   - **`/interview` opens the row**, as its first workflow action, for anything that
+     went through it. An interviewed feature's clock therefore includes its own
+     planning; a new app's F1 clock includes the interview, the design, both approvals
+     and the fresh-session handoff.
+   - **BUILD opens the row** for a direct build that skipped `/interview` — immediately
+     before implementation begins, not after.
+   - **BUILD closes the row, always.** `green_at` is written only after all required
+     and available verification passes — acceptance checks, visual verification when
+     UI changed, the evaluator pass when a trigger applied. If a required check fails
+     or is skipped, the row stays open and records why. Tooling unavailability blocks
+     green only when that verification is required by the acceptance criteria or the
+     release boundary. A `green_at` written ahead of its evidence turns the metric
+     into fiction, and a metric nobody can trust stops the looking.
+   - Never backfill `started_at` from memory, and never open and close a row in the
+     same action.
+
+   Opening or closing a row is bookkeeping, not a gate: it costs one line and stops
+   for nobody.
 
    **Feature 1 is a walking skeleton**: the thinnest end-to-end usable path through
    UI → API → data (→ auth if relevant). If dependencies genuinely prevent that,

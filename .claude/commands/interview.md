@@ -15,6 +15,32 @@ DESIGN → SPECIFY for that change — but do **not** rerun or rewrite Part 1 (t
 users, outcome, stack, auth model) unless the product outcome itself changed. Say
 plainly that you are escalating, and why, before you do it.
 
+## FIRST ACTION — start the clock
+Once the mode is known and before you ask anything, open one row in the
+`docs/PROGRESS.md` metric log. This starts the clock on the governing metric —
+request → correct, green, usable feature. It is not a gate; nothing waits on it.
+
+- **NEW-APP MODE** → open the row for **F1, the walking skeleton**, now. F1's measured
+  time therefore includes this interview, the design, both approvals and the
+  fresh-session handoff — which is the point: that is real time between the request
+  and something usable. Name it `F1 — (walking skeleton)` and rename it once Phase 3
+  names the feature. F2 onward are opened when work on them begins, not here.
+- **FEATURE MODE** → read `docs/SPEC.md` for the next feature number and open that
+  row.
+
+Record at minimum: `feature`, `started_at` = now UTC, `green_at` = `—`. Read the
+clock, never estimate it: `date -u +%Y-%m-%dT%H:%MZ`, or in PowerShell
+`(Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mmZ")`.
+
+**`green_at` is never written here.** The BUILD loop in `CLAUDE.md` closes the row,
+and only after all required and available verification passes.
+
+**At most one row may be open** (`green_at` = `—`) at a time. If one already is, the
+previous feature never went green — resolve that row before opening a new one.
+
+If this planning session ends with nothing to build — no-build, postponed, abandoned —
+delete the row you opened. An open row must always mean work in flight.
+
 ## APPROVAL GATES — count them, and do not add more
 | Work | Approvals | What is approved |
 |---|---|---|
@@ -22,7 +48,8 @@ plainly that you are escalating, and why, before you do it.
 | Feature | **1** | the feature delta (including the mockup, if UI) |
 | One-sentence reversible change | **0** | build it directly — do not run this command |
 
-The Phase 1 problem summary is non-blocking and is not one of these.
+The Phase 1 problem summary is non-blocking and is not one of these. Neither is
+opening or closing a metric row.
 
 ## PHASE 1 — DISCOVER (new-app mode; elicitation only, no solutions)
 Interview me using the AskUserQuestion tool, in batches of at most 4 questions.
@@ -99,8 +126,11 @@ Append to `docs/SPEC.md` under `# Part 2 — Spec`:
 8. **Short file/step plan.**
 
 **SPEC GATE (approval 2 of 2)** — Present the completed spec for my review. After I
-approve: do NOT begin implementation. Tell me to start a fresh session to execute it —
-the build session treats `docs/SPEC.md` as the source of truth per CLAUDE.md.
+approve: do NOT begin implementation. Rename the open F1 row to the name Phase 3 gave
+it, leave `started_at` alone, and tell me to start a fresh session to execute it — the
+build session treats `docs/SPEC.md` as the source of truth per CLAUDE.md. A new app is
+the one case where the handoff is worth its cost: the build session should start on
+the spec, not on three phases of discovery.
 
 ## FEATURE MODE
 Read `docs/SPEC.md` and `docs/DECISIONS.md` before asking anything. DECISIONS.md
@@ -139,8 +169,24 @@ If this feature appears to require either, that is the escalation signal — say
 stop, rather than doing it quietly.
 
 **FEATURE GATE (the single approval)** — present the feature entry, and the mockup if
-one was made. After I approve: do NOT begin implementation. Tell me to start a fresh
-session to build it.
+one was made. After I approve, **continue straight into the BUILD loop in `CLAUDE.md`,
+in this same session.** Do not stop, do not ask, do not tell me to open a fresh
+session: the approval you just took is the approval to build, and the metric row is
+already open from FIRST ACTION. Leaving Plan Mode is not a new gate.
+
+Start a fresh session only when one of these is actually true:
+- **Planning turned out to be unusually large** — a full escalation to DESIGN →
+  SPECIFY, say — so the build would start buried under discovery detail.
+- **This session's context is demonstrably degraded** — you are re-reading files you
+  already read, contradicting your own earlier findings, or acting on stale file
+  state — such that continuing is likely to cause rework.
+- **The active intent materially changed**, and the feature about to be built is no
+  longer what this session has been working on.
+
+Judge that on observed evidence, never on a context-percentage threshold. When one of
+them holds, say so and recommend a fresh session — a recommendation I can wave off,
+not a stop. Never stop merely to create a routine approval gate for a reset; that is
+the cost this rule exists to delete.
 
 ## UI BLOCK (conditional — only when the work adds or changes a screen)
 Exactly four questions, one batch:
