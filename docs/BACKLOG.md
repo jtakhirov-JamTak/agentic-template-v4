@@ -148,11 +148,17 @@
   without fabricating the comparison. `effortLevel` is unchanged at `high`.
 
 ## Found during Session A (handoff v2.2), deliberately not fixed there
-- **[C4/C5] `.githooks/pre-commit` is mode `100644` at template source**, so every
-  scaffold repairs it with `git update-index --chmod=+x` and an automatic commit.
+- **[C4/C5 — RESOLVED 2026-08-26] `.githooks/pre-commit` is now mode `100755` at
+  template source.** It was `100644`, so a hand clone got a hook the OS will not
+  execute and only the scaffold's repair step masked it. Fixed at source with
+  `git update-index --chmod=+x`; verify with `git ls-files -s .githooks/pre-commit`.
+ The scaffold's repair step is now a no-op and should become a
+  verification (that half lives in `~/.claude/new-app.ps1`, not this repo).
 - **[C5] `/new-app` still creates up to two automatic commits** (the chmod commit, and
   the `py`-launcher commit when `python` is missing). Invoking `/new-app` should not
-  imply authorisation to commit.
+  imply authorisation to commit. **Still open**, though the chmod commit has nothing
+  left to commit once C4/C5 above lands, so only the `py`-launcher commit remains in
+  practice.
 - **[C7] "red code cannot be committed" is still claimed** in `.githooks/pre-commit`'s
   comment and in `CLAUDE.md`. A local hook is not an independent trust boundary.
 - **[A3 — RESOLVED 2026-08-24, verified by live dispatch] Frontmatter hooks fire and

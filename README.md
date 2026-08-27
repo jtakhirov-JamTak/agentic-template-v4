@@ -25,9 +25,10 @@ started there loads no project `CLAUDE.md`.
 
 1. `gh repo create <name> --template jtakhirov-JamTak/agentic-template-v4 --private --clone`
 2. `cd <name>` ; `git config core.hooksPath .githooks`
-3. `git update-index --chmod=+x .githooks/pre-commit` then commit the mode change
-   (Windows can't set the executable bit; CI/WSL/macOS skip non-executable hooks).
-   Confirm with `git ls-files -s .githooks/pre-commit` — mode should be `100755`.
+3. Verify the hook is executable: `git ls-files -s .githooks/pre-commit` — mode
+   must be `100755`. It is committed that way at template source, so this is a
+   check, not a repair. If it ever reads `100644`, the hook is silently skipped on
+   CI/WSL/macOS; fix it at source rather than per clone.
 4. Confirm `python --version` works in the shell Claude Code uses. If only `py`
    resolves, change `"command": "python"` to `"command": "py"` in
    `.claude/settings.json` — there is one hook entry.
@@ -69,6 +70,13 @@ coverage before v4.
   dot (handoff B3). `.gitignore` and `write_guard.py` agree on that; they used to
   disagree.
 - Edit a file in `supabase/migrations/` → blocked. Edit `CLAUDE.md` → blocked.
+- Governance is not shell-writable either: `cp x CLAUDE.md`, `sed -i … CLAUDE.md`,
+  `echo x > .claude/settings.json`, `mv`, `tee`, `dd of=`, `rm CLAUDE.md` and the
+  PowerShell cmdlet forms → all blocked. Reading it (`cat CLAUDE.md`), copying it
+  *out* (`cp CLAUDE.md /tmp/x`), `git add CLAUDE.md`, a commit message that names
+  it, and drafting into `docs/proposed/CLAUDE.md` all stay allowed. **This bullet
+  is machine-local** — see the B2 note above; `write_guard.py` covers only the
+  write tools.
 - `npm test` runs without a prompt. `git push` → asks you, in either shell.
 - Blocked in **both** shells: `git commit --no-verify` and its `-n` shorthand ·
   `git config core.hooksPath x` · `git reset --hard` (even chained after
@@ -90,8 +98,11 @@ coverage before v4.
   `Set-Content supabase/migrations/001.sql` → blocked ·
   recursive `Remove-Item` → denied, single-file `Remove-Item` → allowed.
 - `package.json` with no `verify` script → `git commit` rejects. With a failing
-  `npm run verify` → rejects. Covered by `scripts/hooks/test_pre_commit.py`, which
-  tests the script's logic, not its installation — see residual gap 5.
+  `npm run verify` → rejects. **Only in a clone that has run
+  `git config core.hooksPath .githooks` (setup step 2).** Unwired — which is the
+  state of this template's own clone — the hook never runs and this check passes
+  vacuously. Covered by `scripts/hooks/test_pre_commit.py`, which tests the
+  script's logic, not its installation — see residual gap 5.
 - Spawn the evaluator; have it try `echo x > src/a.ts` (bash) or
   `Set-Content src/a.ts 'x'` (PowerShell) → allowlist blocks both. **This one
   depends on a shell guard being registered somewhere** (see the B2 note above):
@@ -178,13 +189,20 @@ which reads like a block and would make the probe lie.
    `write_guard.py` and `.githooks/pre-commit` for other stacks — and the
    user-level `shell_guard.py`, if this machine has one.
 5. `.githooks/pre-commit` is drift control, not a trust boundary: a local hook is
-   bypassable, and in this template repo it is committed mode `100644` with
-   `core.hooksPath` unset, so it does not fire here at all. Its test suite covers
-   the script's logic, not its installation. CI is the real backstop and does not
-   exist yet.
-6. Governance lock: the agent can't edit `.claude/`, `.githooks/`, `CLAUDE.md`.
-   You edit those manually — that's the point, and it means template-maintenance
-   sessions hand you files to copy in.
+   bypassable, and in this template repo `core.hooksPath` is unset, so it does not
+   fire here at all. Its mode is `100755`, which makes it executable in clones that
+   do wire it and changes nothing about this one. Its test suite covers the script's
+   logic, not its installation. CI is the real backstop and does not exist yet.
+6. Governance lock — two layers with different reach, and only one of them ships
+   here. `write_guard.py` blocks the agent from writing `.claude/`, `.githooks/`
+   and `CLAUDE.md` on `Edit|Write|MultiEdit`; that travels with the repo and holds
+   on any machine. It never sees a shell command. The shell route (`cp`, `sed -i`,
+   `> file`, `mv`, `tee`, `dd`, `rm`) is closed by `check_governance` in the
+   **user-level** `shell_guard.py`, which is machine-local (handoff B2): on a
+   machine without that guard the shell half does not exist and governance is
+   freely rewritable there. Neither layer binds you — you edit those files
+   manually, which is the point, and it means template-maintenance sessions hand
+   you files to copy in.
 
 ## Put-back triggers (add complexity only on evidence from a real build)
 - Sessions keep ending with a dirty tree → restore the v2 Stop hook

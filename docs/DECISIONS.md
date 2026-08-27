@@ -6,6 +6,31 @@ Inclusion test: record it only if a future session would reasonably ask
 
 ---
 
+## 2026-08-25 — Governance protection goes in the global guard; the pre-commit claim goes in the docs
+
+**Governance shell-writes are blocked in the user-level guard, not a restored
+project copy.** The B2 put-back trigger below was considered and deliberately not
+fired: restoring `scripts/hooks/shell_guard.py` would reinstate ~132 ms per shell
+call of double-guard cost, measured in B2, to buy protection on machines that do not
+exist yet. `check_governance()` went into `~/.claude/hooks/shell_guard.py` instead,
+scoped to governance-path mutation only. **The cost is stated rather than hidden:**
+this protection is machine-local, so a checkout elsewhere has the write-tool half
+(`write_guard.py`, which ships) and not the shell half. `CLAUDE.md` and `README.md`
+now separate those two reaches instead of presenting one enforcement story. **Put
+back the project copy** under the existing B2 triggers — they are unchanged by this.
+
+**`.githooks/pre-commit` stays unwired in this clone; only the claim changed.**
+Wiring it here would not materially change protection: this template has no
+`package.json`, so the hook allows every commit by design, and `new-app.ps1` already
+wires and readback-asserts it for the apps that do have one. Adding
+`git config core.hooksPath .githooks` to this clone would have bought nothing and
+added a claim to keep true. A shell-guard exemption for the wiring command was
+rejected outright: it would put a hole in a rule that currently has none, to save
+the human one command they run once per clone. Demoted from P0 on that basis — the
+false-green risk was in the documentation, and the documentation is what changed.
+
+---
+
 ## 2026-08-25 — Template P0 pass: routing, build loop, context ownership, truthfulness
 
 One session, one intent: reduce interruptions and remove claims the framework cannot

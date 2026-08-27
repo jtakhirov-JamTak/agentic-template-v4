@@ -6,6 +6,75 @@ would also hit; APP_FIX_LOG.md = the rest.)
 
 ---
 
+## 2026-08-25 — Governance was writable from the shell; the docs claimed otherwise
+
+**Problem.** `write_guard.py` is registered for `Edit|Write|MultiEdit` only, so it
+never sees a shell command. `CLAUDE.md` nonetheless stated, under a heading reading
+"Guardrails (deterministic — do not weaken)", that "`.claude/`, `.githooks/`, and
+this file change only via the human". Measured against the live guard, eight shell
+forms rewrote or deleted governance at exit 0: `cp foo CLAUDE.md`,
+`sed -i 's/a/b/' CLAUDE.md`, `echo hi > CLAUDE.md`,
+`cat foo > .claude/settings.json`, `cp foo .claude/commands/interview.md`,
+`rm CLAUDE.md`, `mv foo.md CLAUDE.md`, `tee CLAUDE.md < foo`. Controls in the same
+run (`--no-verify`, `git push --force`, `cat .env`) returned exit 2, so the probe
+could distinguish. Found while installing a human-approved `CLAUDE.md` change: the
+copy succeeded through a layer that was documented as closed.
+
+**Fix.** Added `check_governance()` to the user-level `~/.claude/hooks/shell_guard.py`,
+called per segment beside `check_recursive_delete`. It is token-based rather than a
+regex over the command string, for the same reason `strip_quoted()` exists: a commit
+message may legitimately name `CLAUDE.md`, so only the operands of a verb that
+actually writes are treated as targets. `cp`/`mv`/`install`/`ln` contribute only
+their LAST operand, keeping `cp CLAUDE.md /tmp/backup` (a read) allowed. Paths are
+resolved against `CLAUDE_PROJECT_DIR` exactly as `write_guard.py` resolves them, so
+the two guards cannot drift about what is protected, and `docs/proposed/CLAUDE.md`
+— the sanctioned route for drafting a governance change — stays writable. `import os`
+was added with it: without it the `NameError` would have been swallowed by the
+module's fail-open `except`, and the guard would have allowed everything silently.
+
+**Also fixed the claim, not just the code.** The shell guard is user-level and
+machine-local (handoff B2), so this protection does not travel with the template.
+`CLAUDE.md` and `README.md` now separate what ships with the repo (`write_guard.py`,
+write tools only) from what is machine-local (`shell_guard.py`, the shell route),
+and say plainly that on a machine without `~/.claude` configured, governance is
+freely rewritable from the shell.
+
+**Regression test.** 27 cases in `~/.claude/hooks/test_shell_guard.py` (suite 249 →
+276): 16 BLOCK covering every measured bypass in both shells plus the glued
+redirect, quoted destination, `dd of=`, and a second-segment form; 11 ALLOW pinning
+the over-block direction — reading, `cp` governance *out*, `git add CLAUDE.md`, a
+commit message naming the file, `docs/proposed/CLAUDE.md`, `docs/CLAUDE.md`, and the
+near-miss directory `.claudette/`. Mutation `d1-governance-off` disables the check
+and asserts exactly those 16 turn red with no collateral — verified: 16 expected, 16
+actual. The fix was confirmed against itself: `cp docs/proposed/CLAUDE.md CLAUDE.md`,
+the exact command that exposed the hole earlier in the session, is now blocked.
+
+## 2026-08-25 — `.githooks/pre-commit` has never run in this clone
+
+**Problem.** `core.hooksPath` is unset at local, global and effective scope, and
+`.git/hooks/` holds no non-sample hook, so `.githooks/pre-commit` is inert here —
+including for the commits made in this session. `CLAUDE.md` listed it among the
+guardrails with no indication that it requires per-clone wiring, which reads as an
+active verification layer and is a false-green path for anyone trusting the list.
+
+**Fix — documentation only, deliberately.** `README.md` setup step 2 and
+`~/.claude/new-app.ps1` (Step 2, with a readback assertion) already wire it for real
+apps, and `README.md` residual gap 5 already recorded that this clone is unwired;
+the defect was that `CLAUDE.md` did not. It now describes the hook as a per-clone
+layer that does nothing until `git config core.hooksPath .githooks` is run, and says
+this template's own commits are not gated by it. This clone was deliberately left
+unwired: it has no `package.json`, so the hook would allow every commit anyway, and
+wiring it would buy no protection while adding a claim to maintain. No shell-guard
+exemption was added for the wiring command — `git config core.hooksPath` stays
+blocked in both directions.
+
+**Regression test.** None, and that is the honest position: the defect was a false
+claim in prose, and `test_pre_commit.py` already covers the script's logic while
+explicitly not covering its installation (README residual gap 5). A test asserting
+"this clone is unwired" would pin an accident rather than a requirement.
+
+---
+
 ## 2026-08-24 — Deny rules blocked safe work: unstaging and single-file deletion
 
 **Problem.** Two `permissions.deny` rules blocked legitimate operations that the

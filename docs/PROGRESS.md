@@ -53,10 +53,13 @@ Then record `cycle_time` = `green_at` − `started_at` as elapsed time (`1h40m`,
 - **human_stops** — how many times the build loop stopped for the human. An ordinary
   feature should be 0; the BUILD section lists the only legitimate reasons. Anything
   above 0 carries its reason in the row.
-- **rework** — how many times a feature marked complete had to be reopened.
-- **defects_after_green** — defects found after the feature went green, whether by the
-  evaluator or in use. Each also gets a dated `docs/FIX_LOG.md` entry with its
-  regression test.
+- **rework** — how many times work already believed finished had to be reopened
+  *before* green, evaluator P1 fixes included. The evaluator pass runs inside the
+  feature's own loop, so a finding it raises there is rework, not an escaped defect.
+- **defects_after_green** — the escaped-defect counter: defects found in use after
+  `green_at` was written. A later defect does **not** reopen the row — `cycle_time`
+  already happened and cannot be un-measured. It increments this column and gets a
+  dated `docs/FIX_LOG.md` entry with its regression test.
 
 A row that never gets filled in is itself the signal: the loop is not being followed,
 and the metric cannot be read.

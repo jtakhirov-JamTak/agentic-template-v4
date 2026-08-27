@@ -2,10 +2,12 @@
 
 Runs the hook script directly with bash in a temp working directory. It
 deliberately does NOT go through a real `git commit`: this repo's
-`core.hooksPath` is unset and the hook is committed mode 100644
-(docs/BACKLOG.md C4/C5), so the hook does not fire here at all. These tests
-cover the script's LOGIC, not its installation. Do not read a green run as
-evidence that the hook is wired up.
+`core.hooksPath` is unset, so the hook does not fire here at all. (The mode is
+100755 as of 2026-08-26, which makes it executable in clones that wire it; that
+fixed a real defect but changes nothing for this repo, and nothing here depends
+on the mode either way, since bash is invoked explicitly.) These tests cover the
+script's LOGIC, not its installation. Do not read a green run as evidence that
+the hook is wired up.
 
 `npm` and `node` are shimmed onto PATH so cases are hermetic and fast.
 

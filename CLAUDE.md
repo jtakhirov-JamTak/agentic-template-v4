@@ -119,27 +119,48 @@ fail) are not repeated here and are never overridden.
   `~/.claude/commands/save-context.md`. `docs/PROGRESS.md` is not a handoff: it holds
   shipped milestones and the metric log. Commit only when the human approves.
 
-## Guardrails (deterministic — do not weaken)
-Which layer enforces what, because they are not the same layer:
+## Guardrails (do not weaken)
+Which layer enforces what, and how far each one reaches. They are not the same
+layer and they do not travel together.
+
+**Ships with this repo — holds in any clone, on any machine:**
 - `.claude/settings.json` **permissions.deny** blocks: reading secrets (`.env*`,
   `*.pem`, keys) and the literal destructive git/delete prefixes. Every `.env*`
   is secret; the non-secret example file is `env.example`, no leading dot.
 - `.claude/settings.json` **hooks** register `write_guard.py` for
   `Edit|Write|MultiEdit` — one process, which blocks writing secret files,
-  self-modifying governance, editing existing migrations, and committing a
-  credential in any field a write can carry.
-- **`shell_guard.py` is registered at user level, not by this project**
-  (handoff B2). It is what actually blocks `--no-verify`, repointing
-  `core.hooksPath`, `git reset --hard` in every `-C`/`-c`/`--git-dir` spelling,
-  force pushes, and recursive deletes — and it holds the evaluator's shell
-  allowlist. On a machine without that user-level guard, none of those are
-  blocked. See `docs/DECISIONS.md` for the put-back trigger.
+  writing governance (`.claude/`, `.githooks/`, `CLAUDE.md`), editing existing
+  migrations, and committing a credential in any field a write can carry. Its
+  reach is those three tools and nothing else: a hook matching
+  `Edit|Write|MultiEdit` never sees a shell command.
+
+**Machine-local — exists only where `~/.claude` is configured (handoff B2):**
+- **`shell_guard.py` is registered at user level, not by this project.** It is
+  what actually blocks `--no-verify`, repointing `core.hooksPath`,
+  `git reset --hard` in every `-C`/`-c`/`--git-dir` spelling, force pushes,
+  recursive deletes, and shell writes or deletes aimed at governance — and it
+  holds the evaluator's shell allowlist. On a machine without that user-level
+  guard **none of those are blocked**, and `cp`, `sed -i`, a redirect, `mv`,
+  `tee` or `rm` will rewrite governance there with nothing objecting. See
+  `docs/DECISIONS.md` for the put-back trigger.
+
+**Per-clone — does nothing until someone turns it on:**
 - `.githooks/pre-commit` runs `npm run verify` when the project defines one, and
-  fails the commit if `package.json` exists without one. It is fast local drift
-  control, not a trust boundary: a local hook is bypassable, so CI is the backstop.
-- `.claude/`, `.githooks/`, and this file change only via the human.
+  fails the commit if `package.json` exists without one. It is inert until that
+  clone runs `git config core.hooksPath .githooks` (README setup step 2;
+  `new-app.ps1` does it for generated apps and asserts the readback).
+  **This template's own clone is not wired, so its own commits are not gated by
+  it.** Even wired, it is fast local drift control, not a trust boundary: a local
+  hook is bypassable, so CI is the backstop.
+
+**Installing a governance change is the human's move.** `.claude/`, `.githooks/`
+and this file are closed to the agent on the write tools everywhere, and from the
+shell wherever the user-level guard is present. Neither layer binds the human —
+that asymmetry is the design. Propose the new text somewhere else and let them
+apply it.
 
 Safe operations are deliberately NOT blocked: `git reset HEAD file`,
-`rm file.txt`, `Remove-Item file.txt`, reading and writing `env.example`.
-Over-blocking is a framework defect, not caution. If a hook blocks you, fix the
-approach — never work around it.
+`rm file.txt`, `Remove-Item file.txt`, reading and writing `env.example`, reading
+`CLAUDE.md`, and drafting a governance change under `docs/`. Over-blocking is a
+framework defect, not caution. If a hook blocks you, fix the approach — never
+work around it.
