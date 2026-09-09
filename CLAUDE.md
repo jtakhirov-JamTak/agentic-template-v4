@@ -71,10 +71,11 @@ fail) are not repeated here and are never overridden.
    defined in global `~/.claude/CLAUDE.md`. Nothing else. Unrelated discoveries go to
    `docs/BACKLOG.md`; stay on the current intent.
 
-   **Production gate — the one exception to zero build-time approvals.** For any app
-   with real users (`pure-eq`), before executing any operation that can modify
-   existing production user data or change auth/RLS behaviour — a migration, a repair
-   script, a policy edit, anything — show it and wait.
+   **Production gate — the one exception to zero build-time approvals.** Once this app
+   has real users, before executing any operation that can modify existing production
+   user data or change auth/RLS behaviour — a migration, a repair script, a policy
+   edit, anything — show it and wait. `~/.claude/PROJECTS.md` records which apps have
+   users; **if you cannot tell, assume it does.**
 
    **Visual verification.** Requires browser tooling (Claude in Chrome or equivalent).
    If it is not available in this session, say so and skip it — do not substitute a
