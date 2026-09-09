@@ -16,6 +16,18 @@
   "when working inside this repo", or move the check to a user-level hook the way
   `shell_guard.py` already is.
 
+- **Second, independent hole found in review 2026-09-08: the governance rule has no
+  containment check, so it fails even when the hook IS loaded.** `write_guard.py:183-184`
+  computes `rel = relpath(abspath(file_path), root)`. A path in another repo yields
+  `../agentic-template-v4/CLAUDE.md`, which matches neither `rel == g` nor
+  `rel.startswith(g)` at `:130-131`, so the write is allowed. `MIGRATION_DIRS` has the
+  same defect; `is_secret_file` is basename-based and does hold cross-repo, so secrets
+  were never in play. Fix: reject any `rel` beginning with `..` outright, before the
+  GOVERNANCE and MIGRATION_DIRS loops. **Both holes are real and independent** — the entry
+  above is why nothing fired in that particular session (no `Edit|Write|MultiEdit` hook is
+  registered at user level at all), this one is why nothing would have fired even if it
+  had been. Fixing either alone leaves the other open.
+
 ## Found during the template P0 pass (2026-08-25), not fixed there
 
 - **No app was ever scaffolded via `new-app.ps1`** — all four predate it (Feb-Jun
