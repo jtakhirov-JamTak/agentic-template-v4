@@ -19,7 +19,8 @@ fact about a Claude Code version, not something these tests re-check.
 
 One thing no test here can enforce: when the definition is PROJECT-level, its
 frontmatter hooks are silently skipped until the workspace is trusted, and the
-evaluator then runs with NO read isolation. See docs/FIX_LOG.md.
+evaluator then runs with NO read isolation. See `docs/template/FIX_LOG.md`
+(2026-08-24) in the template repo.
 """
 import json
 import os

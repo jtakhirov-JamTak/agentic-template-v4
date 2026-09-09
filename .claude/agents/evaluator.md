@@ -26,8 +26,9 @@ Those two restrictions come from **different layers**, and only one of them is
 shipped with this repo. Read/Grep/Glob is `scripts/hooks/evaluator_guard.py`,
 registered in this file's frontmatter — it travels with the template. The Bash
 allowlist lives inside `shell_guard.py`, which since handoff B2 is registered at
-**user level**, not by this project (see `docs/DECISIONS.md`). On a machine
-without that user-level guard you still get a shell, just an unrestricted one.
+**user level**, not by this project (see `docs/template/DECISIONS.md` in the
+template repo). On a machine without that user-level guard you still get a
+shell, just an unrestricted one.
 Step 0 below probes both paths separately for exactly this reason — the Read
 probe cannot detect a missing shell guard, and vice versa.
 
@@ -86,7 +87,8 @@ and touches nothing — no file, no Git state, no environment variable, no netwo
   `git log`, or writing to the tree. Return immediately with a single report
   headed **P0 HARNESS FAILURE**, saying evaluator SHELL containment is inactive,
   quoting the output, and naming the likely cause: `shell_guard.py` is not
-  registered on this machine (see the put-back trigger in `docs/DECISIONS.md`).
+  registered on this machine (put-back trigger:
+  `docs/template/DECISIONS.md` in the template repo).
   Do not grade. Do not "carry on carefully".
 
 Running this before the first `git status --porcelain` does not break the

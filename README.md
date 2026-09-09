@@ -57,7 +57,9 @@ coverage before v4.
 > registered once at **user level** in `~/.claude/settings.json` on the maintainer
 > machine, which covers every repo including this one. On any machine without that
 > configuration, **none of the shell bullets below hold** and the evaluator loses its
-> shell allowlist. Put-back trigger and full reasoning: `docs/DECISIONS.md`.
+> shell allowlist. Put-back trigger and full reasoning: `docs/template/DECISIONS.md`
+> in the template repo (`jtakhirov-JamTak/agentic-template-v4`) — a generated app
+> inherits this README but not that history.
 
 - `/hooks` shows the project PreToolUse hook matching `Edit|Write|MultiEdit`
   (plus the evaluator's own `Read|Grep|Glob` hook from its frontmatter, and the
@@ -184,7 +186,7 @@ which reads like a block and would make the probe lie.
    here-string bodies are stripped before parsing, so a file whose *text* contains a
    blocked command can be authored with a heredoc. Redirect targets are still
    operands, so `cat <<EOF > .env` still blocks. (This reverses an earlier documented
-   limit — see `docs/DECISIONS.md`.)
+   limit — see `docs/template/DECISIONS.md` in the template repo.)
 4. Stack assumptions: `npm run verify`, Supabase/Postgres migration dirs. Edit
    `write_guard.py` and `.githooks/pre-commit` for other stacks — and the
    user-level `shell_guard.py`, if this machine has one.

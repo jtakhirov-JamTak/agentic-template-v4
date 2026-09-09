@@ -142,7 +142,7 @@ layer and they do not travel together.
   holds the evaluator's shell allowlist. On a machine without that user-level
   guard **none of those are blocked**, and `cp`, `sed -i`, a redirect, `mv`,
   `tee` or `rm` will rewrite governance there with nothing objecting. See
-  `docs/DECISIONS.md` for the put-back trigger.
+  `docs/template/DECISIONS.md` in the template repo for the put-back trigger.
 
 **Per-clone — does nothing until someone turns it on:**
 - `.githooks/pre-commit` runs `npm run verify` when the project defines one, and
